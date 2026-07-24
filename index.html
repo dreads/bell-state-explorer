@@ -12,53 +12,28 @@
 
 <header>
   <h1>Bell state density matrix</h1>
+  <h2 class="circuit-heading">Circuit diagram</h2>
+  <div id="circuit-diagram"></div>
   <p class="subtitle">
-    Two qubits through a Hadamard and a CNOT. Set the input bits, then watch the
+    Two qubits through a Hadamard and a CNOT. Set the input states by setting the qubit values or changing the phase and family, then watch the
     density matrix respond to dephasing and to an imbalance in the amplitudes.
   </p>
 </header>
 
-<div class="visuals">
-  <div class="matrix-panel">
-    <div id="grid" aria-live="off"></div>
-    <div class="key">
-      <span class="key-item">
-        <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.62"/></svg>
-        large magnitude
-      </span>
-      <span class="key-item">
-        <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.26"/></svg>
-        small magnitude
-      </span>
-      <span class="key-item">
-        <svg width="22" height="22" aria-hidden="true" class="gridlines"><rect x="0.5" y="0.5" width="21" height="21"/></svg>
-        zero
-      </span>
-      <span class="key-item">
-        <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.62"/><rect x="5" y="9" width="12" height="4" class="sign-bar"/></svg>
-        negative
-      </span>
-    </div>
-  </div>
-  <div class="bloch-row" id="bloch-spheres"></div>
-</div>
-
-<div class="controls-strip">
-  <div class="controls-group">
+<div class="controls-row">
+  <fieldset>
+    <legend>Input state</legend>
     <p class="state-line" id="state-label">|Φ⁺⟩</p>
-    <fieldset>
-      <legend>Input state</legend>
-      <div class="pair">
-        <button type="button" id="q0" aria-pressed="false">q0 = 0</button>
-        <button type="button" id="q1" aria-pressed="false">q1 = 0</button>
-      </div>
-      <p class="coupling">↕ same two bits ↕</p>
-      <div class="pair">
-        <button type="button" id="phase" aria-pressed="false">phase +</button>
-        <button type="button" id="family" aria-pressed="false">Φ family</button>
-      </div>
-    </fieldset>
-  </div>
+    <div class="pair">
+      <button type="button" id="q0" aria-pressed="false">q0 = 0</button>
+      <button type="button" id="q1" aria-pressed="false">q1 = 0</button>
+    </div>
+    <p class="coupling">↕ same two bits ↕</p>
+    <div class="pair">
+      <button type="button" id="phase" aria-pressed="false">phase +</button>
+      <button type="button" id="family" aria-pressed="false">Φ family</button>
+    </div>
+  </fieldset>
 
   <fieldset class="channel-fieldset">
     <legend>Channel</legend>
@@ -84,33 +59,53 @@
     </div>
     <button type="button" id="reset" class="reset-btn">Reset</button>
   </fieldset>
-
-  <div class="controls-group">
-    <div class="readouts">
-      <div class="readout">
-        <div class="label">Concurrence</div>
-        <div class="value" id="concurrence">1.00</div>
-      </div>
-      <div class="readout">
-        <div class="label">Purity</div>
-        <div class="value" id="purity">1.00</div>
-      </div>
-    </div>
-    <p class="reading" id="reading" aria-live="polite"></p>
-  </div>
 </div>
 
-<section class="circuit-section">
-  <h2 class="circuit-heading">Circuit diagram</h2>
-  <div id="circuit-diagram"></div>
-</section>
-
-<footer>
+<div class="layout">
+<div class="matrix-panel">
+  <div id="grid" aria-live="off"></div>
+  <div class="key">
+    <span class="key-item">
+      <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.62"/></svg>
+      large magnitude
+    </span>
+    <span class="key-item">
+      <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.26"/></svg>
+      small magnitude
+    </span>
+    <span class="key-item">
+      <svg width="22" height="22" aria-hidden="true" class="gridlines"><rect x="0.5" y="0.5" width="21" height="21"/></svg>
+      zero
+    </span>
+    <span class="key-item">
+      <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.62"/><rect x="5" y="9" width="12" height="4" class="sign-bar"/></svg>
+      negative
+    </span>
+  </div>
   <p>
     Rows and columns run 00, 01, 10, 11. Diagonal entries are measurement
     probabilities; off-diagonal entries are coherences.
   </p>
-</footer>
+</div>
+
+<div class="bloch-row" id="bloch-spheres"></div>
+
+<aside class="sidebar">
+  <div class="readouts">
+    <div class="readout">
+      <div class="label">Concurrence</div>
+      <div class="value" id="concurrence">1.00</div>
+    </div>
+    <div class="readout">
+      <div class="label">Purity</div>
+      <div class="value" id="purity">1.00</div>
+    </div>
+  </div>
+  <p class="reading" id="reading" aria-live="polite"></p>
+</aside>
+</div>
+
+<footer></footer>
 
 </div>
 <script type="module" src="src/app.js"></script>
