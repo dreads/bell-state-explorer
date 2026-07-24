@@ -111,9 +111,9 @@ function addAxis(svg, from3, to3, labelPos3, labelStr) {
  * Returns a draw(vec0, vec1) function where each vec is [rx, ry, rz].
  */
 export function createBlochSpheres(container) {
-  const drawFns = [];
+  const drawFns = {};
 
-  ['q0', 'q1'].forEach((qubit) => {
+  ['q1', 'q0'].forEach((qubit) => {
     const panel = document.createElement('div');
     panel.className = 'bloch-panel';
 
@@ -168,7 +168,7 @@ export function createBlochSpheres(container) {
     panel.appendChild(labelEl);
     container.appendChild(panel);
 
-    drawFns.push(([rx, ry, rz]) => {
+    drawFns[qubit] = ([rx, ry, rz]) => {
       vecG.replaceChildren();
       if (Math.hypot(rx, ry, rz) < 0.008) return;
 
@@ -187,11 +187,11 @@ export function createBlochSpheres(container) {
         d: headD(ox, oy, ex, ey, 7),
         fill: 'var(--bloch-vec)',
       }));
-    });
+    };
   });
 
   return (vec0, vec1) => {
-    drawFns[0](vec0);
-    drawFns[1](vec1);
+    drawFns.q0(vec0);
+    drawFns.q1(vec1);
   };
 }
