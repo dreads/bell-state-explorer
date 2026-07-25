@@ -5,6 +5,7 @@ import {
   bellFromInput,
   inputFromBell,
   stateLabel,
+  stateEquation,
   partialTrace0,
   partialTrace1,
   blochVector,
@@ -27,6 +28,7 @@ const dom = {};
 let draw;
 let drawBloch;
 let drawCircuit;
+let bellRows;
 
 function query() {
   [
@@ -42,6 +44,7 @@ function query() {
     'state-label',
     'concurrence',
     'purity',
+    'bell-state-list',
     'reading',
     'bloch-spheres',
     'circuit-diagram',
@@ -122,9 +125,14 @@ function render() {
   const pur = purity(rho);
 
   const label = stateLabel({ psi, negative });
-  dom['state-label'].textContent = label;
+  dom['state-label'].textContent = stateEquation({ psi, negative });
   dom.concurrence.textContent = conc.toFixed(2);
   dom.purity.textContent = pur.toFixed(2);
+
+  const bellKey = `${psi ? 'psi' : 'phi'}-${negative ? 'minus' : 'plus'}`;
+  bellRows.forEach((row) => {
+    row.classList.toggle('current', row.dataset.state === bellKey);
+  });
   dom.reading.textContent = interpret({
     conc,
     pur,
@@ -144,6 +152,7 @@ function init() {
   draw = createMatrixGrid(dom.grid);
   drawBloch = createBlochSpheres(dom['bloch-spheres']);
   drawCircuit = createCircuitDiagram(dom['circuit-diagram']);
+  bellRows = dom['bell-state-list'].querySelectorAll('.bell-row');
 
   dom.q0.addEventListener('click', () => toggleBit('q0'));
   dom.phase.addEventListener('click', () => toggleBit('q0'));

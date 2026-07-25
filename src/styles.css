@@ -242,8 +242,51 @@ input[type="range"] {
 
 .state-line {
   font-family: var(--font-data);
-  font-size: 1.75rem;
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow-x: auto;
   margin: 0 0 1rem;
+}
+
+.bell-state-panel {
+  margin-bottom: 1.25rem;
+}
+
+.bell-state-panel .label {
+  margin-bottom: 0.5rem;
+}
+
+.bell-state-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-family: var(--font-data);
+  font-size: 0.85rem;
+}
+
+.bell-row {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--ink-soft);
+}
+
+.bell-ket {
+  color: var(--ink);
+}
+
+.bell-row.current {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.bell-row.current .bell-ket {
+  color: var(--paper);
 }
 
 .reading {
