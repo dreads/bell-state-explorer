@@ -89,6 +89,18 @@ export function stateLabel({ psi, negative }) {
   return `|${psi ? 'Ψ' : 'Φ'}${negative ? '⁻' : '⁺'}⟩`;
 }
 
+/**
+ * Full Dirac equation for a Bell state, canonical (equal-superposition) form.
+ * Independent of theta/dephasing — this names which of the four Bell states
+ * the input bits select, not the current (possibly imbalanced or mixed) rho.
+ */
+export function stateEquation({ psi, negative }) {
+  const label = stateLabel({ psi, negative });
+  const [first, second] = psi ? ['01', '10'] : ['00', '11'];
+  const sign = negative ? '−' : '+';
+  return `${label} = (|${first}⟩ ${sign} |${second}⟩)/√2`;
+}
+
 /** Reduced 2×2 density matrix for qubit 0 (trace out qubit 1). */
 export function partialTrace0(rho) {
   return [

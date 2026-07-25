@@ -8,6 +8,7 @@ import {
   bellFromInput,
   inputFromBell,
   stateLabel,
+  stateEquation,
   partialTrace0,
   partialTrace1,
   blochVector,
@@ -130,6 +131,13 @@ test('stateLabel renders the four Bell kets', () => {
   assert.equal(stateLabel({ psi: false, negative: true }), '|Φ⁻⟩');
   assert.equal(stateLabel({ psi: true, negative: false }), '|Ψ⁺⟩');
   assert.equal(stateLabel({ psi: true, negative: true }), '|Ψ⁻⟩');
+});
+
+test('stateEquation renders the canonical formula for the four Bell states', () => {
+  assert.equal(stateEquation({ psi: false, negative: false }), '|Φ⁺⟩ = (|00⟩ + |11⟩)/√2');
+  assert.equal(stateEquation({ psi: false, negative: true }), '|Φ⁻⟩ = (|00⟩ − |11⟩)/√2');
+  assert.equal(stateEquation({ psi: true, negative: false }), '|Ψ⁺⟩ = (|01⟩ + |10⟩)/√2');
+  assert.equal(stateEquation({ psi: true, negative: true }), '|Ψ⁻⟩ = (|01⟩ − |10⟩)/√2');
 });
 
 test('concurrence picks the populated block regardless of family', () => {

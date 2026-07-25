@@ -107,5 +107,6 @@ From README — areas where the codebase is designed to grow:
 - Vanilla ES modules, no transpilation
 - SVG created via `document.createElementNS` with helper `el(name, attrs)`
 - Tests use Node's built-in `assert` — no test framework
+- Always create tests for math. We want 100% coverage.
 - No classes; module-level functions with explicit parameter objects
 - CSS classes named semantically (`.cell`, `.sign-bar`, `.tick`, `.readout`)
