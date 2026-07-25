@@ -113,7 +113,7 @@ function addAxis(svg, from3, to3, labelPos3, labelStr) {
 export function createBlochSpheres(container) {
   const drawFns = {};
 
-  ['q1', 'q0'].forEach((qubit) => {
+  ['q0', 'q1'].forEach((qubit) => {
     const panel = document.createElement('div');
     panel.className = 'bloch-panel';
 
