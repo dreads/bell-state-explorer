@@ -13,6 +13,7 @@ import {
   partialTrace1,
   blochVector,
   applyLocalRotation,
+  classifyState,
 } from '../src/state.js';
 
 const BELL = { psi: false, negative: false, theta: Math.PI / 4, dephasing: 0 };
@@ -361,6 +362,25 @@ test('applyLocalRotation composes additively: Ry(a) then Ry(b) equals Ry(a+b)', 
       }
     }
   }
+});
+
+test('classifyState identifies each of the five regimes', () => {
+  const regime = (theta, dephasing) => {
+    const rho = densityMatrix({ psi: false, negative: false, theta, dephasing });
+    return classifyState({
+      conc: concurrence(rho),
+      pur: purity(rho),
+      dephasing,
+      theta,
+    });
+  };
+
+  assert.equal(regime(Math.PI / 4, 1), 'fully-dephased');
+  assert.equal(regime(0, 0), 'product-state');
+  assert.equal(regime(Math.PI / 2, 0), 'product-state');
+  assert.equal(regime(Math.PI / 4, 0), 'maximally-entangled');
+  assert.equal(regime(Math.PI / 8, 0), 'pure-partial');
+  assert.equal(regime(Math.PI / 4, 0.5), 'partially-dephased');
 });
 
 test('rotating qubit 0 and qubit 1 independently commutes', () => {

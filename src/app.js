@@ -10,11 +10,20 @@ import {
   partialTrace1,
   blochVector,
   applyLocalRotation,
+  classifyState,
 } from './state.js';
 import { createMatrixGrid } from './matrix-grid.js';
 import { createBlochSpheres } from './bloch-sphere.js';
 import { createCircuitDiagram } from './circuit-diagram.js';
 import { buildExportPayload } from './export.js';
+import { translate } from './i18n.js';
+import en from '../locales/en.js';
+
+// Single-locale for now: `activeLocale` is the seam where a fetched/selected
+// locale bundle will replace `en` once multi-locale loading lands (see the
+// i18n assessment report). `en` is always passed as the fallback so any
+// future partial bundle degrades to English per-key rather than breaking.
+const activeLocale = en;
 
 const model = {
   q0: 0,
@@ -74,23 +83,6 @@ function setPair(button, pressed, label) {
   button.setAttribute('aria-pressed', String(pressed));
 }
 
-function interpret({ conc, pur, dephasing, theta }) {
-  const nearZero = (x) => Math.abs(x) < 0.02;
-  if (nearZero(conc) && dephasing > 0.98) {
-    return 'Fully dephased. The coherences are gone, so this is a classical correlated mixture with the same measurement statistics but no entanglement.';
-  }
-  if (nearZero(conc) && (nearZero(theta) || nearZero(theta - Math.PI / 2))) {
-    return 'All amplitude sits on one basis state. Still a pure state, but a product state with nothing to entangle.';
-  }
-  if (conc > 0.98 && pur > 0.98) {
-    return 'A maximally entangled Bell state. Equal populations, full coherence between them.';
-  }
-  if (pur > 0.98) {
-    return 'Pure but only partially entangled. Unequal amplitudes weaken the correlation without introducing any mixedness.';
-  }
-  return 'Partially dephased. The coherence terms have shrunk while the populations hold, so entanglement is decaying toward a classical mixture.';
-}
-
 function render() {
   const { psi, negative } = bellFromInput(model.q0, model.q1);
   // Compute Bell state (with dephasing), then apply local rotation to q0.
@@ -135,12 +127,8 @@ function render() {
   bellRows.forEach((row) => {
     row.classList.toggle('current', row.dataset.state === bellKey);
   });
-  dom.reading.textContent = interpret({
-    conc,
-    pur,
-    dephasing: model.dephasing,
-    theta: model.theta,
-  });
+  const regimeKey = classifyState({ conc, pur, dephasing: model.dephasing, theta: model.theta });
+  dom.reading.textContent = translate(activeLocale, en, `interpret.${regimeKey}`);
 
   drawBloch(
     blochVector(partialTrace0(rho)),
