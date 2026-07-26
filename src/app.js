@@ -17,13 +17,16 @@ import { createBlochSpheres } from './bloch-sphere.js';
 import { createCircuitDiagram } from './circuit-diagram.js';
 import { buildExportPayload } from './export.js';
 import { translate } from './i18n.js';
+import { loadManifest, loadLocaleBundle, detectLocale } from './locale-loader.js';
 import en from '../locales/en.js';
 
-// Single-locale for now: `activeLocale` is the seam where a fetched/selected
-// locale bundle will replace `en` once multi-locale loading lands (see the
-// i18n assessment report). `en` is always passed as the fallback so any
-// future partial bundle degrades to English per-key rather than breaking.
-const activeLocale = en;
+const LOCALE_STORAGE_KEY = 'bell-state-locale';
+
+// `en` is always the fallback bundle, so any locale — including a partial
+// PR-contributed one — degrades to English per-key rather than breaking.
+// `activeLocale` starts as `en` so the first paint is never blank while
+// initLocale() resolves a saved preference or auto-detected match.
+let activeLocale = en;
 
 const model = {
   q0: 0,
@@ -64,6 +67,7 @@ function query() {
     'local-rotation-1-value',
     'reset',
     'export-state',
+    'locale-picker',
   ].forEach((id) => {
     dom[id] = document.getElementById(id);
   });
@@ -81,6 +85,82 @@ function toggleBit(which) {
 function setPair(button, pressed, label) {
   button.textContent = label;
   button.setAttribute('aria-pressed', String(pressed));
+}
+
+/** Add `bundle` as a picker option if it isn't already listed (covers a
+ * locale that was auto-detected or manually loaded but never made it into
+ * locales/manifest.json). */
+function ensureOption(bundle) {
+  const select = dom['locale-picker'];
+  const exists = Array.from(select.options).some((o) => o.value === bundle.meta.code);
+  if (!exists) {
+    const option = document.createElement('option');
+    option.value = bundle.meta.code;
+    option.textContent = bundle.meta.endonym || bundle.meta.englishName || bundle.meta.code;
+    select.appendChild(option);
+  }
+}
+
+function applyLocale(bundle) {
+  activeLocale = bundle;
+  document.documentElement.lang = bundle.meta.code;
+  document.documentElement.dir = bundle.meta.direction;
+  ensureOption(bundle);
+  dom['locale-picker'].value = bundle.meta.code;
+  render();
+}
+
+function populatePicker(manifestEntries) {
+  const select = dom['locale-picker'];
+  const existing = new Set(Array.from(select.options).map((o) => o.value));
+  manifestEntries.forEach((entry) => {
+    if (existing.has(entry.code)) return;
+    const option = document.createElement('option');
+    option.value = entry.code;
+    option.textContent = entry.endonym || entry.englishName || entry.code;
+    select.appendChild(option);
+  });
+}
+
+async function onLocaleChange(code) {
+  if (code === 'en') {
+    applyLocale(en);
+    localStorage.setItem(LOCALE_STORAGE_KEY, 'en');
+    return;
+  }
+  const bundle = await loadLocaleBundle(code);
+  if (!bundle) {
+    dom['locale-picker'].value = activeLocale.meta.code;
+    return;
+  }
+  applyLocale(bundle);
+  localStorage.setItem(LOCALE_STORAGE_KEY, code);
+}
+
+/**
+ * Populates the picker from locales/manifest.json, then resolves the active
+ * locale: an explicit saved preference wins over auto-detection, which in
+ * turn is tried independently of the manifest (see locale-loader.js) so a
+ * bundle file copied straight into locales/ is found even with no manifest
+ * entry at all. Runs after the first synchronous English render, so a slow
+ * or failed fetch never blocks the initial paint.
+ */
+async function initLocale() {
+  const manifest = await loadManifest();
+  populatePicker(manifest);
+
+  const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
+  if (saved && saved !== 'en') {
+    const bundle = await loadLocaleBundle(saved);
+    if (bundle) {
+      applyLocale(bundle);
+      return;
+    }
+  }
+  if (saved === 'en') return;
+
+  const detected = await detectLocale(navigator.languages || [navigator.language]);
+  if (detected) applyLocale(detected.bundle);
 }
 
 function render() {
@@ -128,7 +208,7 @@ function render() {
     row.classList.toggle('current', row.dataset.state === bellKey);
   });
   const regimeKey = classifyState({ conc, pur, dephasing: model.dephasing, theta: model.theta });
-  dom.reading.textContent = translate(activeLocale, en, `interpret.${regimeKey}`);
+  dom.reading.textContent = translate(activeLocale.strings, en.strings, `interpret.${regimeKey}`);
 
   drawBloch(
     blochVector(partialTrace0(rho)),
@@ -191,6 +271,8 @@ function init() {
 
   dom['export-state'].addEventListener('click', exportState);
 
+  dom['locale-picker'].addEventListener('change', (e) => onLocaleChange(e.target.value));
+
   dom.reset.addEventListener('click', () => {
     model.q0 = 0;
     model.q1 = 0;
@@ -208,6 +290,7 @@ function init() {
   });
 
   render();
+  initLocale();
 }
 
 document.addEventListener('DOMContentLoaded', init);

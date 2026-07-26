@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/dreads/bell-state-explorer/main/schema/locale-bundle.schema.json",
+  "title": "Bell state explorer locale bundle",
+  "description": "Shape of a locale bundle contributed via PR (locales/<code>.json). A bundle may translate any subset of the keys under 'strings' — missing keys fall back to English at runtime, so a bundle never needs to be complete to be valid or useful.",
+  "type": "object",
+  "required": ["meta", "strings"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": { "$ref": "#/$defs/meta" },
+    "strings": { "$ref": "#/$defs/strings" }
+  },
+  "$defs": {
+    "meta": {
+      "type": "object",
+      "required": ["code", "endonym", "englishName", "direction", "targetsVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$",
+          "description": "BCP 47 language tag, e.g. \"ar\", \"pt-BR\"."
+        },
+        "endonym": {
+          "type": "string",
+          "description": "The language's own name for itself, e.g. \"العربية\" — shown in the language picker."
+        },
+        "englishName": {
+          "type": "string",
+          "description": "English name of the language, for contributors and as a fallback label."
+        },
+        "direction": {
+          "enum": ["ltr", "rtl"],
+          "description": "Self-declared text direction. Not inferred from the runtime's Intl support, so any script works without platform assumptions."
+        },
+        "targetsVersion": {
+          "type": "string",
+          "description": "Which locales/en.js STRINGS_VERSION this bundle was written against. Informational — used to flag a bundle as possibly stale, never to reject it."
+        }
+      }
+    },
+    "strings": {
+      "type": "object",
+      "description": "Dot-path-addressed nested string tree. Any key may be omitted; omitted keys fall back to English per-key at runtime (src/i18n.js translate()).",
+      "additionalProperties": false,
+      "properties": {
+        "interpret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fully-dephased": { "type": "string" },
+            "product-state": { "type": "string" },
+            "maximally-entangled": { "type": "string" },
+            "pure-partial": { "type": "string" },
+            "partially-dephased": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

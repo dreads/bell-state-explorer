@@ -20,15 +20,19 @@ src/bloch-sphere.js                      Bloch sphere SVG renderer + sr-only des
 src/circuit-diagram.js                   circuit diagram SVG renderer + sr-only description
 src/export.js                            builds the export payload — no DOM dependency
 src/i18n.js                              translate()/fallback lookup — no DOM dependency
+src/locale-loader.js                     locale discovery/fetch, fetch injectable — no DOM dependency
 src/app.js                               control wiring
 src/styles.css                           light/dark themes via CSS variables
-locales/en.js                            source-of-truth English string bundle (static import)
+locales/en.js                            source-of-truth English bundle (static import)
+locales/manifest.json                    picker option list only — not used for detection
 schema/bell-state-export.schema.json     JSON Schema (draft 2020-12) for the export payload
+schema/locale-bundle.schema.json         JSON Schema (draft 2020-12) for PR-contributed locale bundles
 test/state.test.js                       Node-runnable physics tests (incl. property-based invariants)
 test/matrix-grid.test.js                 tests for matrix-grid.js's pure math helpers
 test/bloch-sphere.test.js                tests for bloch-sphere.js's pure vector-math helpers
 test/export.test.js                      tests for export.js's payload shape and values
 test/i18n.test.js                        tests for i18n.js's lookup/fallback/interpolation
+test/locale-loader.test.js               tests for locale-loader.js (candidate expansion, fetch orchestration)
 ```
 
 ## Architecture
@@ -73,8 +77,9 @@ test/i18n.test.js                        tests for i18n.js's lookup/fallback/int
 - `render()` is the single update path: computes rho → draw → update all DOM readouts
 - Toggle buttons (q0/phase, q1/family) are coupled pairs writing the same two bits
 - The `#reading` interpretation text is `classifyState(...)` (state.js) piped
-  through `translate(activeLocale, en, ...)` (i18n.js) — see "Added: i18n
-  foundation" below before touching either
+  through `translate(activeLocale.strings, en.strings, ...)` (i18n.js)
+- `#locale-picker`, `applyLocale()`, `initLocale()` — see "Added: i18n
+  foundation" below before touching any of this
 
 ### styles.css
 - All colors via CSS custom properties (`--ink`, `--paper`, `--rule`, etc.)
@@ -182,36 +187,60 @@ rather than through a schema-validation library, since this project has no
 dependencies — keep that test in sync with the schema file, neither currently
 enforces the other automatically.
 
-## Added: i18n foundation (Phase 0)
+## Added: i18n foundation (Phase 0 + 1)
 
-This is the first slice of a larger internationalization/localization plan
-(full assessment and architecture proposal delivered as a report, not
-committed to this repo as a doc — ask if you need it re-summarized). Only
-what's described here is actually wired up today:
+Full assessment and architecture rationale delivered as a report, not
+committed to this repo as a doc — ask if you need it re-summarized. Only
+English ships as a maintained locale; **any other locale is contributed by
+PR** — this project has no live/user-submitted content pipeline, no
+"verified" vs "community" distinction, and no build step for locale files.
 
 - `state.js`'s `classifyState(...)` replaces the old `app.js` `interpret()`:
   same branching logic, but returns a key instead of composed English prose.
-- `locales/en.js` is the source-of-truth string bundle — currently just the
-  five `interpret.*` keys, holding byte-identical text to the old hardcoded
-  strings (verified by a DOM-stub regression check; nothing user-visible
-  changed).
+- `locales/en.js` is the source-of-truth bundle: `{ meta: { code, endonym,
+  englishName, direction, targetsVersion }, strings: { interpret: {...} } }`.
+  Ships as a static ES module import (not fetched), so the default language
+  costs no network round-trip and the first paint is never blank.
+  `STRINGS_VERSION` is exported for other bundles' `meta.targetsVersion` to
+  reference — informational only, never enforced at runtime.
 - `src/i18n.js`'s `translate(bundle, fallbackBundle, key, params)` does a
   dot-path lookup with `{placeholder}` interpolation and **silent per-key
-  fallback** to `fallbackBundle` — this is the mechanism that lets a partial
-  or outdated third-party locale bundle keep working forever without the
-  maintainer touching it.
-- `app.js` has a single `activeLocale` const (currently always `en`) marked
-  as the seam where locale selection/loading will plug in later.
+  fallback** to `fallbackBundle` — a partial or outdated PR-contributed
+  bundle keeps working forever without maintainer intervention; it just
+  shows English for whatever key it doesn't have.
+- `src/locale-loader.js`: `expandCandidates(languages)` (pure — expands each
+  BCP-47 tag with its base language, e.g. `pt-BR` → `[pt-BR, pt]`) plus
+  `loadManifest`/`loadLocaleBundle`/`detectLocale` (async, `fetch` injectable
+  for testing). **`detectLocale` probes `locales/<code>.json` directly for
+  each candidate from `navigator.languages`, independent of the manifest** —
+  a bundle file copied straight into `locales/` on a local build is found
+  and used with zero manifest edits. `detectLocale` stops and returns `null`
+  (use `en`) as soon as `"en"` is reached in the candidate list.
+- `locales/manifest.json`: a flat array of `{ code, endonym, englishName }`.
+  This is **only** consulted to populate the language-picker's option list
+  (there's no directory-listing API on static hosting) — it plays no role in
+  auto-detection. Adding a locale via PR = add `locales/<code>.json` + one
+  array entry here.
+- `schema/locale-bundle.schema.json` (draft 2020-12, same convention as the
+  export schema): validates a bundle's `meta`/`strings` shape. `strings.*`
+  properties are all optional (no `required` list) — a bundle is valid
+  whether complete or partial, by design.
+- `app.js`: `#locale-picker` `<select>` in `index.html`'s header.
+  `applyLocale(bundle)` sets `activeLocale`, `document.documentElement.lang`
+  /`.dir` from `bundle.meta`, adds a picker option if missing, and
+  re-renders. `initLocale()` runs after the first (English) render: resolves
+  a saved `localStorage` preference, else `detectLocale(navigator.languages)`,
+  and populates the picker from the manifest — all independently, so a slow
+  or failed fetch never blocks the initial paint.
 
-**Not yet built** (proposed, not started): loading additional locale bundles
-(JSON, fetched on demand, vs. `en`'s static import), a `locales/manifest.json`
-discovery list, automatic `navigator.languages` detection + manual override,
-a language-picker control, a JSON Schema for locale bundle shape, the
-verified/community two-tier badge, `dir="rtl"`/logical-CSS-property work, or
-migrating the other composed-prose strings (`matrix-grid.js`'s `describe()`,
-`bloch-sphere.js`'s and `circuit-diagram.js`'s sr-only templates) to this
-same mechanism. Do not assume any of that exists — check before building on
-top of it.
+**Not yet built**: `dir="rtl"`-driven CSS logical-property fixes (the
+`.slider-row output` / `.reading` physical properties, and the `.layout`
+3-column grid order — see the report), an LTR-lock wrapper for the matrix
+grid and circuit diagram SVGs, migrating `matrix-grid.js`'s `describe()` and
+the Bloch/circuit sr-only templates onto this same mechanism, and
+`Intl.NumberFormat` at the display boundary. A "simple English" reading-level
+variant was considered and explicitly deferred, not built. Do not assume any
+of that exists — check before building on top of it.
 
 ## Planned extension directions
 
