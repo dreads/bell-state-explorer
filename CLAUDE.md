@@ -13,12 +13,16 @@ npm test        # 12 physics unit tests
 ## File structure
 
 ```
-index.html            markup and controls
-src/state.js          physics core — no DOM dependency
-src/matrix-grid.js    SVG renderer
-src/app.js            control wiring
-src/styles.css        light/dark themes via CSS variables
-test/state.test.js    Node-runnable physics tests
+index.html                 markup and controls
+src/state.js                physics core — no DOM dependency
+src/matrix-grid.js          SVG renderer
+src/bloch-sphere.js         Bloch sphere SVG renderer
+src/circuit-diagram.js      circuit diagram SVG renderer
+src/app.js                  control wiring
+src/styles.css              light/dark themes via CSS variables
+test/state.test.js          Node-runnable physics tests (incl. property-based invariants)
+test/matrix-grid.test.js    tests for matrix-grid.js's pure math helpers
+test/bloch-sphere.test.js   tests for bloch-sphere.js's pure vector-math helpers
 ```
 
 ## Architecture
@@ -38,6 +42,9 @@ test/state.test.js    Node-runnable physics tests
 - Returns `draw(rho)` function — only redraws cells (efficient for slider drags)
 - `magnitudeOpacity(value)` → `0.1 + 0.52 * min(1, |v|/0.5)` — floor keeps tiny values visible
 - Negative entries get a `sign-bar` rect knocked out of the cell fill
+- `magnitudeOpacity` and `describe` are exported (in addition to `createMatrixGrid`)
+  specifically so their math/formatting logic gets direct unit tests, per the
+  100%-math-coverage rule below — see `test/matrix-grid.test.js`
 
 ### app.js
 - `model` object holds `{ q0, q1, theta, dephasing }`
@@ -73,6 +80,10 @@ Basis order in rows/cols: 00, 01, 10, 11 (indices 0–3).
 - Dephasing does NOT move the Bloch vectors (partial trace wipes out the coherences)
 - `#bloch-spheres` div in index.html below the main `.layout`
 - CSS: `--bloch-vec`, `--bloch-sphere`, `.bloch-sphere-fill`, `.bloch-panel`, `.bloch-label`
+- The pure vector-math helpers (`norm`, `cross`, `perp`, `circleD`, `headD`) are
+  exported alongside `createBlochSpheres` so they get direct unit tests
+  (`test/bloch-sphere.test.js`) without needing a DOM — same rationale as
+  `matrix-grid.js`'s exported helpers above
 
 ## Added: Local rotation (Ry gate)
 
@@ -107,6 +118,15 @@ From README — areas where the codebase is designed to grow:
 - Vanilla ES modules, no transpilation
 - SVG created via `document.createElementNS` with helper `el(name, attrs)`
 - Tests use Node's built-in `assert` — no test framework
-- Always create tests for math. We want 100% coverage.
+- Always create tests for math. We want 100% coverage. This applies to any
+  exported pure-math helper, not just `src/state.js` — e.g. `magnitudeOpacity`
+  in `matrix-grid.js` and the vector helpers in `bloch-sphere.js` are exported
+  for exactly this reason even though their primary callers are SVG renderers.
+- `npm run test:coverage` (Node 20+, uses `--experimental-test-coverage`)
+  measures this goal directly; `npm test` alone does not check coverage.
+- Prefer property-based tests (randomized sampling over a seeded PRNG, e.g.
+  `mulberry32` in `test/state.test.js`) for invariants that should hold across
+  the whole parameter space (trace, positive-semi-definiteness, rotation
+  group properties), in addition to fixed-value example tests.
 - No classes; module-level functions with explicit parameter objects
 - CSS classes named semantically (`.cell`, `.sign-bar`, `.tick`, `.readout`)

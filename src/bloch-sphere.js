@@ -8,6 +8,10 @@ const CY = 108;        // sphere centre y (shifted down to leave room for z-labe
 
 // Orthographic projection basis: x→lower-right, y→lower-left, z→up
 // Each vector is the 2D [screenX, screenY] displacement per unit in that 3D axis.
+// x and y are mirror images of each other (equal weight, opposite sign on
+// screenX) so the sphere reads as symmetric left-to-right; the 0.65/0.37
+// split is not a true isometric ratio, just a by-eye pick that keeps all
+// three axes visually distinct without any one foreshortening to a point.
 const BX = [0.65, 0.37];
 const BY = [-0.65, 0.37];
 const BZ = [0.0, -1.0];
@@ -19,17 +23,22 @@ function proj(x, y, z) {
   ];
 }
 
-function norm([x, y, z]) {
+export function norm([x, y, z]) {
   const m = Math.hypot(x, y, z);
   return m < 1e-12 ? [0, 0, 0] : [x / m, y / m, z / m];
 }
 
-function cross([ax, ay, az], [bx, by, bz]) {
+export function cross([ax, ay, az], [bx, by, bz]) {
   return [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
 }
 
-// A unit vector perpendicular to n
-function perp(n) {
+/**
+ * A unit vector perpendicular to n, used as one in-plane axis when drawing a
+ * great circle. Crossing with [1,0,0] fails when n is nearly parallel to it
+ * (result collapses toward zero), so fall back to [0,1,0] in that case —
+ * n can't be nearly parallel to both.
+ */
+export function perp(n) {
   return norm(Math.abs(n[0]) < 0.9 ? cross(n, [1, 0, 0]) : cross(n, [0, 1, 0]));
 }
 
@@ -51,8 +60,14 @@ function svgText(x, y, str, attrs = {}) {
   return t;
 }
 
-/** SVG path `d` for a great circle in the plane whose normal is normalVec. */
-function circleD(normalVec) {
+/**
+ * SVG path `d` for a great circle in the plane whose normal is normalVec.
+ * Builds an orthonormal in-plane basis {u, v} for that plane (perp() picks
+ * one axis, cross(n, u) picks the other), then walks the unit circle in
+ * that basis and projects each point to 2D — this is what lets one function
+ * draw all three axis-aligned great circles from a single normal vector.
+ */
+export function circleD(normalVec) {
   const n = norm(normalVec);
   const u = perp(n);
   const v = norm(cross(n, u));
@@ -71,7 +86,7 @@ function circleD(normalVec) {
 }
 
 /** Filled arrowhead triangle at (x2, y2) pointing toward it from (x1, y1). */
-function headD(x1, y1, x2, y2, size = 6) {
+export function headD(x1, y1, x2, y2, size = 6) {
   const dx = x2 - x1, dy = y2 - y1;
   const len = Math.hypot(dx, dy);
   if (len < 1) return '';

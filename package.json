@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "test": "node --test test/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage test/*.test.js",
     "serve": "python3 -m http.server 8000"
   },
   "keywords": [

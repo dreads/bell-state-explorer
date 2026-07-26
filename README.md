@@ -36,9 +36,20 @@ imports mean opening `index.html` directly from the filesystem will not.
 npm test
 ```
 
-Twelve tests covering the physics in `src/state.js`: trace preservation,
-symmetry, the effect of dephasing on populations versus coherences, and the
-bijection between input bits and Bell states.
+Tests cover the physics in `src/state.js` (trace preservation, symmetry,
+positive-semi-definiteness, the effect of dephasing on populations versus
+coherences, the rotation-group properties of the local rotation gate, and the
+bijection between input bits and Bell states) plus the pure math in
+`src/matrix-grid.js` and `src/bloch-sphere.js`. Property-based tests use a
+seeded PRNG so failures are reproducible.
+
+```bash
+npm run test:coverage
+```
+
+Runs the same suite with Node's built-in coverage reporter
+(`--experimental-test-coverage`, requires Node 20+) to check the 100%
+math-coverage goal.
 
 ## Deploying to GitHub Pages
 
@@ -278,6 +289,17 @@ test/state.test.js      physics tests
 
 `src/state.js` has no DOM dependency, so it can be imported in Node, tested, or
 reused elsewhere.
+
+## Known issues
+
+- `render()` in `src/app.js` is a single long function that computes state,
+  updates every DOM readout, and redraws all three visualizations. This
+  matches the documented "single update path" design, but the function has
+  grown enough (rotation math, readout formatting, Bell-row highlighting,
+  Bloch/circuit redraws) that splitting it into named steps (e.g. compute
+  state, update readouts, update visuals) would improve readability. Not
+  done yet — flagged here as a future refactor rather than undertaken
+  alongside unrelated changes.
 
 ## Extending
 

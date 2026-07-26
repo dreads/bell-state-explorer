@@ -19,6 +19,41 @@ const BELL = { psi: false, negative: false, theta: Math.PI / 4, dephasing: 0 };
 const close = (a, b, tol = 1e-9) =>
   assert.ok(Math.abs(a - b) < tol, `${a} not within ${tol} of ${b}`);
 
+// Deterministic PRNG (mulberry32) so randomized/property-based tests below are
+// reproducible — same seed always exercises the same points in parameter space.
+function mulberry32(seed) {
+  return function random() {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const randomRho = (rand) =>
+  densityMatrix({
+    psi: rand() < 0.5,
+    negative: rand() < 0.5,
+    theta: (rand() * Math.PI) / 2,
+    dephasing: rand(),
+  });
+
+const randomAngle = (rand) => (rand() - 0.5) * 4 * Math.PI;
+
+// v^T rho v for a real vector v. Sampling this over many random v at many
+// random rho is a standard black-box check for positive-semi-definiteness:
+// a symmetric matrix is PSD iff this is non-negative for every v.
+function quadForm(rho, v) {
+  let sum = 0;
+  for (let r = 0; r < 4; r += 1) {
+    for (let c = 0; c < 4; c += 1) {
+      sum += v[r] * rho[r][c] * v[c];
+    }
+  }
+  return sum;
+}
+
 test('pure Bell state has four entries of one half', () => {
   const rho = densityMatrix(BELL);
   close(rho[0][0], 0.5);
@@ -232,4 +267,116 @@ test('applyLocalRotation on qubit 1 sweeps only q1 Bloch vector', () => {
   close(rz0, 1);
   close(rx1, 1);
   close(rz1, 0);
+});
+
+// --- Property-based / invariant tests ---
+// These sweep randomized points in parameter space rather than fixed values,
+// so they catch bugs that only show up away from the specific cases above.
+
+test('rho is positive-semi-definite across randomized parameters and rotations', () => {
+  const rand = mulberry32(42);
+  for (let trial = 0; trial < 40; trial += 1) {
+    const base = randomRho(rand);
+    const rho = applyLocalRotation(
+      applyLocalRotation(base, randomAngle(rand), 0),
+      randomAngle(rand), 1,
+    );
+    for (let s = 0; s < 15; s += 1) {
+      const v = [rand() - 0.5, rand() - 0.5, rand() - 0.5, rand() - 0.5];
+      const q = quadForm(rho, v);
+      assert.ok(q > -1e-9, `quadratic form ${q} negative at trial ${trial}, sample ${s}`);
+    }
+  }
+});
+
+test('rho stays symmetric under randomized local rotations', () => {
+  const rand = mulberry32(55);
+  for (let trial = 0; trial < 30; trial += 1) {
+    const base = randomRho(rand);
+    const rho = applyLocalRotation(
+      applyLocalRotation(base, randomAngle(rand), 0),
+      randomAngle(rand), 1,
+    );
+    for (let r = 0; r < 4; r += 1) {
+      for (let c = 0; c < 4; c += 1) {
+        close(rho[r][c], rho[c][r], 1e-9);
+      }
+    }
+  }
+});
+
+test('trace remains one across randomized parameters and local rotations', () => {
+  const rand = mulberry32(2024);
+  for (let trial = 0; trial < 60; trial += 1) {
+    const base = randomRho(rand);
+    const rho = applyLocalRotation(
+      applyLocalRotation(base, randomAngle(rand), 0),
+      randomAngle(rand), 1,
+    );
+    const trace = rho[0][0] + rho[1][1] + rho[2][2] + rho[3][3];
+    close(trace, 1, 1e-9);
+  }
+});
+
+test('concurrence stays within [0, 1] across randomized parameters', () => {
+  const rand = mulberry32(123);
+  for (let trial = 0; trial < 60; trial += 1) {
+    const c = concurrence(randomRho(rand));
+    assert.ok(c >= -1e-9 && c <= 1 + 1e-9, `concurrence ${c} out of [0, 1]`);
+  }
+});
+
+test('applyLocalRotation(-alpha) undoes applyLocalRotation(alpha), for either qubit', () => {
+  // A rotation's inverse being its negation is a defining property of an
+  // orthogonal one-parameter rotation group (which Ry(alpha) is meant to be).
+  const rand = mulberry32(7);
+  for (let trial = 0; trial < 20; trial += 1) {
+    const base = randomRho(rand);
+    for (const qubit of [0, 1]) {
+      const alpha = randomAngle(rand);
+      const rotated = applyLocalRotation(base, alpha, qubit);
+      const restored = applyLocalRotation(rotated, -alpha, qubit);
+      for (let r = 0; r < 4; r += 1) {
+        for (let c = 0; c < 4; c += 1) {
+          close(restored[r][c], base[r][c], 1e-9);
+        }
+      }
+    }
+  }
+});
+
+test('applyLocalRotation composes additively: Ry(a) then Ry(b) equals Ry(a+b)', () => {
+  const rand = mulberry32(99);
+  for (let trial = 0; trial < 20; trial += 1) {
+    const base = randomRho(rand);
+    for (const qubit of [0, 1]) {
+      const a = randomAngle(rand);
+      const b = randomAngle(rand);
+      const sequential = applyLocalRotation(applyLocalRotation(base, a, qubit), b, qubit);
+      const combined = applyLocalRotation(base, a + b, qubit);
+      for (let r = 0; r < 4; r += 1) {
+        for (let c = 0; c < 4; c += 1) {
+          close(sequential[r][c], combined[r][c], 1e-9);
+        }
+      }
+    }
+  }
+});
+
+test('rotating qubit 0 and qubit 1 independently commutes', () => {
+  // Ry on q0 and Ry on q1 act on disjoint tensor factors, so applying them in
+  // either order must produce the same state.
+  const rand = mulberry32(314);
+  for (let trial = 0; trial < 20; trial += 1) {
+    const base = randomRho(rand);
+    const a = randomAngle(rand);
+    const b = randomAngle(rand);
+    const first = applyLocalRotation(applyLocalRotation(base, a, 0), b, 1);
+    const second = applyLocalRotation(applyLocalRotation(base, b, 1), a, 0);
+    for (let r = 0; r < 4; r += 1) {
+      for (let c = 0; c < 4; c += 1) {
+        close(first[r][c], second[r][c], 1e-9);
+      }
+    }
+  }
 });
