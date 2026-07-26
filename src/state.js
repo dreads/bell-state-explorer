@@ -71,6 +71,22 @@ export function purity(rho) {
   return sum;
 }
 
+/**
+ * Classify the current state into one of five qualitative regimes, for a
+ * presentation layer to map to localized prose (see locales/en.js). This
+ * function returns only a key — deliberately no natural-language strings —
+ * so the branching logic (which regime applies) stays in one place and
+ * language never needs to be threaded through it.
+ */
+export function classifyState({ conc, pur, dephasing, theta }) {
+  const nearZero = (x) => Math.abs(x) < 0.02;
+  if (nearZero(conc) && dephasing > 0.98) return 'fully-dephased';
+  if (nearZero(conc) && (nearZero(theta) || nearZero(theta - Math.PI / 2))) return 'product-state';
+  if (conc > 0.98 && pur > 0.98) return 'maximally-entangled';
+  if (pur > 0.98) return 'pure-partial';
+  return 'partially-dephased';
+}
+
 /** Diagonal of rho: the probability of each measurement outcome. */
 export function outcomeProbabilities(rho) {
   return BASIS.map((label, k) => ({ label, probability: rho[k][k] }));

@@ -19,13 +19,16 @@ src/matrix-grid.js                       SVG renderer + sr-only accessible table
 src/bloch-sphere.js                      Bloch sphere SVG renderer + sr-only description
 src/circuit-diagram.js                   circuit diagram SVG renderer + sr-only description
 src/export.js                            builds the export payload — no DOM dependency
+src/i18n.js                              translate()/fallback lookup — no DOM dependency
 src/app.js                               control wiring
 src/styles.css                           light/dark themes via CSS variables
+locales/en.js                            source-of-truth English string bundle (static import)
 schema/bell-state-export.schema.json     JSON Schema (draft 2020-12) for the export payload
 test/state.test.js                       Node-runnable physics tests (incl. property-based invariants)
 test/matrix-grid.test.js                 tests for matrix-grid.js's pure math helpers
 test/bloch-sphere.test.js                tests for bloch-sphere.js's pure vector-math helpers
 test/export.test.js                      tests for export.js's payload shape and values
+test/i18n.test.js                        tests for i18n.js's lookup/fallback/interpolation
 ```
 
 ## Architecture
@@ -37,6 +40,10 @@ test/export.test.js                      tests for export.js's payload shape and
   - `dephasing` 0–1: damps off-diagonal by `(1 - p)`, leaves diagonal unchanged
 - `concurrence(rho)` — entanglement measure 0–1; for this family = `2 * |coherence|`
 - `purity(rho)` — `Tr(rho^2)`; 1 for pure, 0.5 for fully dephased mixture
+- `classifyState({ conc, pur, dephasing, theta })` → one of 5 kebab-case regime
+  keys (`fully-dephased`, `product-state`, `maximally-entangled`, `pure-partial`,
+  `partially-dephased`). Pure branching logic, deliberately no prose — see
+  `locales/en.js` for the strings and `src/i18n.js` for the lookup
 - `bellFromInput(q0, q1)` → `{ negative, psi }` — maps H+CNOT input bits to Bell state
 - `stateLabel({ psi, negative })` → Unicode ket string
 
@@ -65,7 +72,9 @@ test/export.test.js                      tests for export.js's payload shape and
 - `model` object holds `{ q0, q1, theta, dephasing }`
 - `render()` is the single update path: computes rho → draw → update all DOM readouts
 - Toggle buttons (q0/phase, q1/family) are coupled pairs writing the same two bits
-- `interpret()` returns a plain-English description of the current quantum state
+- The `#reading` interpretation text is `classifyState(...)` (state.js) piped
+  through `translate(activeLocale, en, ...)` (i18n.js) — see "Added: i18n
+  foundation" below before touching either
 
 ### styles.css
 - All colors via CSS custom properties (`--ink`, `--paper`, `--rule`, etc.)
@@ -172,6 +181,37 @@ itself is checked in `test/export.test.js` by hand (exact key sets and types)
 rather than through a schema-validation library, since this project has no
 dependencies — keep that test in sync with the schema file, neither currently
 enforces the other automatically.
+
+## Added: i18n foundation (Phase 0)
+
+This is the first slice of a larger internationalization/localization plan
+(full assessment and architecture proposal delivered as a report, not
+committed to this repo as a doc — ask if you need it re-summarized). Only
+what's described here is actually wired up today:
+
+- `state.js`'s `classifyState(...)` replaces the old `app.js` `interpret()`:
+  same branching logic, but returns a key instead of composed English prose.
+- `locales/en.js` is the source-of-truth string bundle — currently just the
+  five `interpret.*` keys, holding byte-identical text to the old hardcoded
+  strings (verified by a DOM-stub regression check; nothing user-visible
+  changed).
+- `src/i18n.js`'s `translate(bundle, fallbackBundle, key, params)` does a
+  dot-path lookup with `{placeholder}` interpolation and **silent per-key
+  fallback** to `fallbackBundle` — this is the mechanism that lets a partial
+  or outdated third-party locale bundle keep working forever without the
+  maintainer touching it.
+- `app.js` has a single `activeLocale` const (currently always `en`) marked
+  as the seam where locale selection/loading will plug in later.
+
+**Not yet built** (proposed, not started): loading additional locale bundles
+(JSON, fetched on demand, vs. `en`'s static import), a `locales/manifest.json`
+discovery list, automatic `navigator.languages` detection + manual override,
+a language-picker control, a JSON Schema for locale bundle shape, the
+verified/community two-tier badge, `dir="rtl"`/logical-CSS-property work, or
+migrating the other composed-prose strings (`matrix-grid.js`'s `describe()`,
+`bloch-sphere.js`'s and `circuit-diagram.js`'s sr-only templates) to this
+same mechanism. Do not assume any of that exists — check before building on
+top of it.
 
 ## Planned extension directions
 
