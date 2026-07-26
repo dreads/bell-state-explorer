@@ -110,6 +110,21 @@ h1 {
   fill: var(--paper);
 }
 
+.cell-value {
+  font-family: var(--font-data);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.cell-value-ink {
+  fill: var(--ink);
+}
+
+.cell-value-paper {
+  fill: var(--paper);
+}
+
 .gridlines rect,
 .gridlines line {
   fill: none;
@@ -187,9 +202,15 @@ button[aria-pressed="true"] {
   text-align: right;
 }
 
+.fieldset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
 .reset-btn {
   display: block;
-  margin-top: 0.75rem;
   padding: 0.3rem 1rem;
   font-size: 0.85rem;
   color: var(--ink-soft);

@@ -136,7 +136,10 @@ export function createBlochSpheres(container) {
       viewBox: `0 0 ${W} ${H}`,
       width: W,
       height: H,
-      'aria-label': `Bloch sphere for ${qubit}`,
+      // Orientation/rotation of a 3D vector doesn't have a native ARIA
+      // equivalent; hidden from the accessibility tree in favor of the
+      // sr-only paragraph below (same pattern as matrix-grid.js).
+      'aria-hidden': 'true',
     });
 
     // Sphere fill
@@ -179,13 +182,24 @@ export function createBlochSpheres(container) {
     labelEl.className = 'bloch-label';
     labelEl.textContent = qubit;
 
+    const vectorText = document.createElement('p');
+    vectorText.className = 'sr-only';
+
     panel.appendChild(svg);
     panel.appendChild(labelEl);
+    panel.appendChild(vectorText);
     container.appendChild(panel);
 
     drawFns[qubit] = ([rx, ry, rz]) => {
       vecG.replaceChildren();
-      if (Math.hypot(rx, ry, rz) < 0.008) return;
+
+      const magnitude = Math.hypot(rx, ry, rz);
+      vectorText.textContent =
+        magnitude < 0.008
+          ? `Bloch vector for ${qubit}: at the origin (maximally mixed, no information about this qubit alone).`
+          : `Bloch vector for ${qubit}: x = ${rx.toFixed(2)}, y = ${ry.toFixed(2)}, z = ${rz.toFixed(2)}, magnitude = ${magnitude.toFixed(2)}.`;
+
+      if (magnitude < 0.008) return;
 
       const [ox, oy] = proj(0, 0, 0);
       const [ex, ey] = proj(rx, ry, rz);

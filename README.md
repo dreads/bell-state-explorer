@@ -274,21 +274,106 @@ this family of states it is exactly twice the magnitude of the coherence.
 dephased mixture here. The two quantities are independent: an imbalanced pure
 state has purity 1 and concurrence below 1.
 
+## Accessibility
+
+This tool targets **WCAG 2.2 Level AA**. That target, and the reasoning
+below, is documented here deliberately: it's a learning tool, and a learning
+tool that only teaches sighted, non-screen-reader users has failed at its own
+purpose for exactly the audience most likely to need a non-visual explanation
+of an inherently visual subject.
+
+The three SVG visuals (density matrix, Bloch spheres, circuit diagram) each
+encode meaning spatially — fill opacity, vector orientation, gate position —
+with no direct ARIA role that captures it. Rather than force partial,
+misleading ARIA labeling onto a complex graphic, each one is marked
+`aria-hidden="true"` and paired with a plain-language equivalent that a
+screen reader actually navigates:
+
+- **Density matrix** — every one of the 16 cells now prints its own value
+  (2 decimals), not just fill opacity, so sighted low-vision users aren't
+  relying on subtle shading differences either. A visually-hidden
+  (`.sr-only`) `<table>` with proper `<th scope="row">`/`<th scope="col">`
+  headers mirrors the same 16 numbers for screen readers.
+- **Bloch spheres** — a `.sr-only` paragraph per qubit states the rx/ry/rz
+  components and magnitude in words.
+- **Circuit diagram** — a `.sr-only` paragraph describes the current input
+  kets, the gate sequence, the output Bell state, and both rotation angles
+  in degrees.
+
+This is the same pattern IBM's Carbon Design System uses for its chart
+components: a complex visualization stays purely visual, and an equivalent
+data table or description carries the same information to assistive
+technology. None of this content is `aria-live` — like the existing `#grid`
+container, updates are available on demand when navigated to, rather than
+interrupting with an announcement on every slider tick. The one deliberate
+exception is `#reading` (`role="status"`), a concise plain-language summary
+meant to be announced.
+
+The cell-text color switches between the page's `--ink` and `--paper` tokens
+at `magnitudeOpacity(value) <= 0.5`, chosen from an actual WCAG relative-
+luminance calculation against this app's real color tokens (worked out in
+detail while implementing it) so contrast stays close to 4.5:1 across the
+fill range, dipping to a documented ~4.1:1 only in a narrow mid-magnitude
+band. If the `--ink`/`--paper` values ever change, recheck that threshold.
+
+**Maintaining this**: any new visual added to this project must ship with an
+equivalent accessible text representation using this same
+`aria-hidden` + `.sr-only`-equivalent pattern, and any new on-visual text must
+be checked against WCAG 2.2 AA contrast (4.5:1 normal text, 3:1 for text at
+least 18pt, or 14pt bold) before merging. This is not optional polish — it's
+the difference between the tool teaching everyone or teaching only some
+people.
+
+## Exporting
+
+The **Export current state** button (next to Reset) downloads a JSON
+snapshot of everything on screen: the raw settings (`q0`, `q1`, `theta`,
+`dephasing`, both rotation angles — in radians, matching `src/state.js`'s own
+convention) and every derived measurement (the full density matrix,
+concurrence, purity, outcome probabilities, both Bloch vectors, and the
+Bell-state label/equation).
+
+The format is described by `schema/bell-state-export.schema.json`, written
+against [JSON Schema draft 2020-12](https://json-schema.org/draft/2020-12/schema)
+— the current IETF-track JSON Schema specification, which IBM engineers are
+among the editors of. Every export includes a `$schema` field pointing at
+that file's canonical URL, so any standard JSON Schema validator can check an
+exported file without extra configuration.
+
+The point of this is reproducibility: for a learning tool, being able to
+hand an exported file to an instructor, a peer, or an independent script that
+re-implements the same formulas (in Python, Mathematica, whatever) and get
+back "yes, these numbers are actually right" is the entire value of the
+feature. A learning tool whose numbers can't be checked is just an assertion.
+
+**Maintaining this**: any change to the exported shape (new field, renamed
+field, changed unit) must update `schema/bell-state-export.schema.json` in
+the same change, and bump `schemaVersion` in `src/export.js` on breaking
+changes. This project has no dependencies, so `test/export.test.js` checks
+the exported shape by hand (exact key sets, types) rather than through a
+schema-validation library — keep that test in sync with the schema too, since
+neither one currently enforces the other automatically.
+
 ## Structure
 
 ```
-index.html              markup and controls
-src/state.js            density matrix, concurrence, purity, partial trace, local rotation — no DOM
-src/matrix-grid.js      density matrix SVG rendering
-src/bloch-sphere.js     individual qubit Bloch sphere rendering
-src/circuit-diagram.js  H + CNOT circuit diagram
-src/app.js              control wiring
-src/styles.css          light and dark themes
-test/state.test.js      physics tests
+index.html                        markup and controls
+src/state.js                       density matrix, concurrence, purity, partial trace, local rotation — no DOM
+src/matrix-grid.js                 density matrix SVG rendering + sr-only accessible table
+src/bloch-sphere.js                individual qubit Bloch sphere rendering + sr-only description
+src/circuit-diagram.js             H + CNOT circuit diagram + sr-only description
+src/export.js                      builds the schema-conforming export payload — no DOM
+src/app.js                         control wiring
+src/styles.css                     light and dark themes
+schema/bell-state-export.schema.json   JSON Schema (draft 2020-12) for exported state
+test/state.test.js                 physics tests
+test/matrix-grid.test.js           matrix-grid.js math helper tests
+test/bloch-sphere.test.js          bloch-sphere.js vector math tests
+test/export.test.js                export payload shape/value tests
 ```
 
-`src/state.js` has no DOM dependency, so it can be imported in Node, tested, or
-reused elsewhere.
+`src/state.js` and `src/export.js` have no DOM dependency, so they can be
+imported in Node, tested, or reused elsewhere.
 
 ## Known issues
 

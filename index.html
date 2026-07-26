@@ -20,6 +20,7 @@
   </p>
 </header>
 
+<main>
 <div class="controls-row">
   <fieldset>
     <legend>Input state</legend>
@@ -57,7 +58,10 @@
       <input type="range" id="local-rotation-1" min="0" max="360" step="1" value="0">
       <output id="local-rotation-1-value" for="local-rotation-1">0°</output>
     </div>
-    <button type="button" id="reset" class="reset-btn">Reset</button>
+    <div class="fieldset-actions">
+      <button type="button" id="reset" class="reset-btn">Reset</button>
+      <button type="button" id="export-state" class="reset-btn">Export current state</button>
+    </div>
   </fieldset>
 </div>
 
@@ -78,13 +82,15 @@
       zero
     </span>
     <span class="key-item">
-      <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.62"/><rect x="5" y="9" width="12" height="4" class="sign-bar"/></svg>
+      <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.62"/><rect x="4" y="16" width="14" height="3" class="sign-bar"/></svg>
       negative
     </span>
   </div>
   <p>
     Rows and columns run 00, 01, 10, 11. Diagonal entries are measurement
-    probabilities; off-diagonal entries are coherences.
+    probabilities; off-diagonal entries are coherences. Every cell shows its
+    exact value; fill darkness and the underline are a visual summary of the
+    same numbers for a quick scan.
   </p>
 </div>
 
@@ -122,9 +128,10 @@
       </div>
     </div>
   </div>
-  <p class="reading" id="reading" aria-live="polite"></p>
+  <p class="reading" id="reading" role="status"></p>
 </aside>
 </div>
+</main>
 
 <footer></footer>
 
