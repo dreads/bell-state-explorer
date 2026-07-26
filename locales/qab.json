@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "code": "qab",
+    "endonym": "Mock RTL",
+    "englishName": "Mock: right-to-left",
+    "direction": "rtl",
+    "targetsVersion": "2"
+  },
+  "strings": {
+    "interpret": {
+      "fully-dephased": "Zora vintal kuresh. Bantu velmori achkedo tal senvara, du roqa maldeen visroka fen bantu elgorai.",
+      "product-state": "Alma tresqui bonavel oru senda. Kuresh velmori, du roqa alma tresqui zantul.",
+      "maximally-entangled": "Zantul bonavel: alma tresqui elgorai Beltana. Senvara equalu, kuresh fulra.",
+      "pure-partial": "Bonavel, du roqa senvara partielu elgorai. Tresqui unequ alma velmori senda, du maldeen visroka.",
+      "partially-dephased": "Partielu-zora vintal. Kuresh velmori achkedo, du senvara tal roqa, elgorai maldeen bantu classiqa."
+    },
+    "ui": {
+      "docTitle": "Zantul senvara elgorai roqavel",
+      "metaDescription": "Alma tresqui bonavel oru senda, kuresh velmori du maldeen visroka fen bantu.",
+      "languageLabel": "Roqavel",
+      "heading": "Zantul senvara elgorai",
+      "circuitHeading": "Bantu roqavel",
+      "subtitle": "Alma tresqui oru senda kuresh velmori. Zantul bonavel du roqa maldeen visroka fen bantu elgorai, tresqui partielu senvara achkedo.",
+      "inputStateLegend": "Senvara oru",
+      "couplingNote": "↕ zantul bantu ↕",
+      "channelLegend": "Kuresh",
+      "dephasingLabel": "Vintal",
+      "balanceLabel": "Bonavel θ",
+      "rotateQ0Label": "Roqa q0 α",
+      "rotateQ1Label": "Roqa q1 β",
+      "resetButton": "Zora oru",
+      "exportButton": "Tresqui elgorai senvara",
+      "keyLargeMagnitude": "bantu elgorai",
+      "keySmallMagnitude": "bantu maldeen",
+      "keyZero": "zora",
+      "keyNegative": "partielu",
+      "matrixKeyParagraph": "Alma tresqui du roqa bantu 00, 01, 10, 11. Senvara equalu elgorai maldeen visroka; kuresh velmori achkedo bantu classiqa. Zantul bonavel tresqui senda, du roqa partielu vintal fen bantu elgorai.",
+      "concurrenceLabel": "Elgorai",
+      "purityLabel": "Bonavel",
+      "bellStateLabel": "Zantul senvara",
+      "qubitEquals": "{qubit} = {value}",
+      "phaseSign": "kuresh {sign}",
+      "familyLabel": "{family} bantu",
+      "degrees": "{value}°",
+      "percent": "{value}%"
+    },
+    "matrixGrid": {
+      "svgTitle": "Senvara oru",
+      "svgDescIntro": "Bantu roqavel elgorai maldeen visroka fen bantu senda. Kuresh velmori achkedo tresqui, du roqa partielu zora vintal.",
+      "tableCaption": "Senvara oru elgorai roqa bantu classiqa",
+      "entryTemplate": "roqa {row} bantu {col} tresqui {value}",
+      "summaryTemplate": "Elgorai senda: {entries}.",
+      "joinText": "; ",
+      "allZero": "Zantul bantu zora."
+    },
+    "blochSphere": {
+      "origin": "Zantul roqavel {qubit}: zora oru (bantu maldeen visroka, du roqa partielu senda).",
+      "vector": "Zantul roqavel {qubit}: x = {x}, y = {y}, z = {z}, elgorai = {magnitude}."
+    },
+    "circuitDiagram": {
+      "description": "Bantu: q0 zora |{q0}⟩ du q1 zora |{q1}⟩. Kuresh roqavel q0 tresqui elgorai CNOT du q0 senvara oru q1 bantu maldeen, partielu zantul {label}. Achkedo, Rᵧ roqa {alpha0} elgorai tresqui q0 du {alpha1} elgorai tresqui q1."
+    }
+  }
+}

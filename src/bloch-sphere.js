@@ -1,4 +1,14 @@
+import { interpolate } from './i18n.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// English defaults so this module works standalone even with no locale
+// layer wired up; app.js passes the active locale's resolved strings on
+// every draw() once one exists.
+const DEFAULT_STRINGS = {
+  origin: 'Bloch vector for {qubit}: at the origin (maximally mixed, no information about this qubit alone).',
+  vector: 'Bloch vector for {qubit}: x = {x}, y = {y}, z = {z}, magnitude = {magnitude}.',
+};
 
 const W = 180;
 const H = 200;
@@ -190,14 +200,20 @@ export function createBlochSpheres(container) {
     panel.appendChild(vectorText);
     container.appendChild(panel);
 
-    drawFns[qubit] = ([rx, ry, rz]) => {
+    drawFns[qubit] = ([rx, ry, rz], strings = DEFAULT_STRINGS) => {
       vecG.replaceChildren();
 
       const magnitude = Math.hypot(rx, ry, rz);
       vectorText.textContent =
         magnitude < 0.008
-          ? `Bloch vector for ${qubit}: at the origin (maximally mixed, no information about this qubit alone).`
-          : `Bloch vector for ${qubit}: x = ${rx.toFixed(2)}, y = ${ry.toFixed(2)}, z = ${rz.toFixed(2)}, magnitude = ${magnitude.toFixed(2)}.`;
+          ? interpolate(strings.origin, { qubit })
+          : interpolate(strings.vector, {
+              qubit,
+              x: rx.toFixed(2),
+              y: ry.toFixed(2),
+              z: rz.toFixed(2),
+              magnitude: magnitude.toFixed(2),
+            });
 
       if (magnitude < 0.008) return;
 
@@ -219,8 +235,8 @@ export function createBlochSpheres(container) {
     };
   });
 
-  return (vec0, vec1) => {
-    drawFns.q0(vec0);
-    drawFns.q1(vec1);
+  return (vec0, vec1, strings = DEFAULT_STRINGS) => {
+    drawFns.q0(vec0, strings);
+    drawFns.q1(vec1, strings);
   };
 }

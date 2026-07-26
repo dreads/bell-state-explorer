@@ -1,4 +1,14 @@
+import { interpolate } from './i18n.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// English default so this module works standalone even with no locale
+// layer wired up; app.js passes the active locale's resolved string on
+// every draw() once one exists.
+const DEFAULT_STRINGS = {
+  description:
+    'Circuit: q0 starts at |{q0}⟩ and q1 starts at |{q1}⟩. A Hadamard gate on q0 is followed by a CNOT with q0 as control and q1 as target, preparing the Bell state {label}. After that, an Rᵧ rotation of {alpha0} degrees is applied to q0 and {alpha1} degrees to q1.',
+};
 
 const W = 680;
 const H = 90;
@@ -130,7 +140,7 @@ export function createCircuitDiagram(container) {
 
   const toDegrees = (radians) => Math.round((radians * 180) / Math.PI);
 
-  return function draw({ q0, q1, label, alpha0, alpha1 }) {
+  return function draw({ q0, q1, label, alpha0, alpha1 }, strings = DEFAULT_STRINGS) {
     inLabel0.textContent = `|${q0}⟩`;
     inLabel1.textContent = `|${q1}⟩`;
     outLabel.textContent = label;
@@ -138,11 +148,12 @@ export function createCircuitDiagram(container) {
     ryGroup0.setAttribute('opacity', Math.abs(alpha0) < 0.005 ? '0.28' : '1');
     ryGroup1.setAttribute('opacity', Math.abs(alpha1) < 0.005 ? '0.28' : '1');
 
-    description.textContent =
-      `Circuit: q0 starts at |${q0}⟩ and q1 starts at |${q1}⟩. ` +
-      `A Hadamard gate on q0 is followed by a CNOT with q0 as control and ` +
-      `q1 as target, preparing the Bell state ${label}. ` +
-      `After that, an Rᵧ rotation of ${toDegrees(alpha0)} degrees is applied ` +
-      `to q0 and ${toDegrees(alpha1)} degrees to q1.`;
+    description.textContent = interpolate(strings.description, {
+      q0,
+      q1,
+      label,
+      alpha0: toDegrees(alpha0),
+      alpha1: toDegrees(alpha1),
+    });
   };
 }

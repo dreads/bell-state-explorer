@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "code": "qac",
+    "endonym": "Partial",
+    "englishName": "Mock: partial bundle (fallback test)",
+    "direction": "ltr",
+    "targetsVersion": "2"
+  },
+  "strings": {
+    "interpret": {
+      "fully-dephased": "[qac] Only a handful of keys are translated here — everything else should silently fall back to English.",
+      "maximally-entangled": "[qac] Second translated interpret key in this deliberately incomplete mock bundle."
+    },
+    "ui": {
+      "resetButton": "[qac] Reset",
+      "exportButton": "[qac] Export"
+    }
+  }
+}

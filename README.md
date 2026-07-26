@@ -354,26 +354,103 @@ the exported shape by hand (exact key sets, types) rather than through a
 schema-validation library — keep that test in sync with the schema too, since
 neither one currently enforces the other automatically.
 
+## Internationalization
+
+Only English ships as a maintained locale today. Every other language is
+added by a contributor, not the maintainer — this app was built so that
+adding a language never requires the maintainer to speak it, review its
+grammar, or touch app logic at all.
+
+**The rule this depends on**: no user-visible or accessibility-relevant
+string may be hardcoded, anywhere. Static text in `index.html` gets a
+`data-i18n="namespace.key"` attribute; anything computed at render time goes
+through `t(key, params)` (in `app.js`) or `translate()`/`interpolate()` (in
+the renderer modules). This is enforced two ways:
+
+- `npm run lint:i18n` (`scripts/check-i18n-coverage.js`, zero dependencies)
+  scans for untagged static text, hardcoded `.textContent` literals, drift
+  between `index.html`'s `<title>`/meta description and `locales/en.js`, and
+  `data-i18n` values that don't resolve to a real key. It runs in CI on every
+  push (see `.github/workflows/deploy.yml`) and fails the build if it finds
+  anything.
+- `test/locale-bundles.test.js` (part of `npm test`) shape-validates every
+  `locales/*.json` bundle against what `locales/en.js` actually defines —
+  catching typos and malformed metadata before they reach a screen reader or
+  a user.
+
+Genuinely non-translatable content — bra-ket notation, `q0`/`q1`, the
+picker's own "English" option — is marked `data-i18n-exempt` rather than
+left silently untagged, so the exception is a deliberate, visible decision
+in the markup, not indistinguishable from someone forgetting to tag a string.
+
+### Adding a language
+
+**To add it to this repository**, open a PR:
+
+1. Add `locales/<code>.json`, following `schema/locale-bundle.schema.json`
+   ([JSON Schema draft 2020-12](https://json-schema.org/draft/2020-12/schema),
+   same convention as the export schema). It doesn't need to be complete —
+   any key you skip falls back to English automatically, forever, for
+   everyone — but it does need to be **tested**: uncomment it in
+   `locales/manifest.json`, run it locally (`npm run serve`), and confirm it
+   actually renders correctly in a browser before opening the PR.
+2. Add one entry to `locales/manifest.json` so it shows up in the language
+   picker.
+3. Make sure `npm test` and `npm run lint:i18n` both pass.
+
+The maintainer reviews this as code — shape, not grammar. Nobody is on the
+hook for verifying translation quality in every language that gets added.
+
+**To use a language only locally**, without a PR: drop `locales/<code>.json`
+into your own checkout's `locales/` folder. If it matches one of your
+browser's language preferences, it's picked up automatically — detection
+probes `locales/<code>.json` directly and doesn't consult the manifest at
+all. To reach it from the picker instead, add a line to your own local
+`locales/manifest.json`. Either way, nothing here touches the shared repo.
+
+### Trying it out
+
+Three mock/test-only locales — `locales/{qaa,qab,qac}.json` — exist
+specifically to exercise this mechanism by hand: `qaa` (long, accented Latin
+text, stresses layout), `qab` (`direction: "rtl"`, exercises the picker's
+right-to-left handling), and `qac` (deliberately incomplete, to watch the
+English fallback happen live). They're commented out in
+`locales/manifest.json` by default — uncomment a line, restart
+`npm run serve`, hard-reload, and pick it from the language picker. Their
+codes (`qaa`–`qtz`) are the range ISO 639-2 reserves for private/local use,
+so they can never collide with a real contributed language.
+
 ## Structure
 
 ```
-index.html                        markup and controls
-src/state.js                       density matrix, concurrence, purity, partial trace, local rotation — no DOM
-src/matrix-grid.js                 density matrix SVG rendering + sr-only accessible table
-src/bloch-sphere.js                individual qubit Bloch sphere rendering + sr-only description
-src/circuit-diagram.js             H + CNOT circuit diagram + sr-only description
-src/export.js                      builds the schema-conforming export payload — no DOM
-src/app.js                         control wiring
-src/styles.css                     light and dark themes
-schema/bell-state-export.schema.json   JSON Schema (draft 2020-12) for exported state
-test/state.test.js                 physics tests
-test/matrix-grid.test.js           matrix-grid.js math helper tests
-test/bloch-sphere.test.js          bloch-sphere.js vector math tests
-test/export.test.js                export payload shape/value tests
+index.html                             markup and controls
+src/state.js                            density matrix, concurrence, purity, partial trace, local rotation, classifyState — no DOM
+src/matrix-grid.js                      density matrix SVG rendering + sr-only accessible table
+src/bloch-sphere.js                     individual qubit Bloch sphere rendering + sr-only description
+src/circuit-diagram.js                  H + CNOT circuit diagram + sr-only description
+src/export.js                           builds the schema-conforming export payload — no DOM
+src/i18n.js                             translate()/interpolate()/fallback lookup — no DOM
+src/locale-loader.js                    locale discovery/fetch, fetch injectable — no DOM
+src/app.js                              control wiring
+src/styles.css                          light and dark themes
+locales/en.js                           source-of-truth English string bundle (static import)
+locales/manifest.json                   language-picker option list (not used for auto-detection)
+locales/qaa.json, qab.json, qac.json    mock/test-only locales, commented out by default
+schema/bell-state-export.schema.json    JSON Schema (draft 2020-12) for exported state
+schema/locale-bundle.schema.json        JSON Schema (draft 2020-12) for contributed locale bundles
+scripts/check-i18n-coverage.js          npm run lint:i18n — hardcoded-string scanner, runs in CI
+test/state.test.js                      physics tests
+test/matrix-grid.test.js                matrix-grid.js math helper tests
+test/bloch-sphere.test.js               bloch-sphere.js vector math tests
+test/export.test.js                     export payload shape/value tests
+test/i18n.test.js                       i18n.js lookup/fallback/interpolation tests
+test/locale-loader.test.js              locale-loader.js candidate-expansion/fetch-orchestration tests
+test/locale-bundles.test.js             shape-validates every locales/*.json bundle
 ```
 
-`src/state.js` and `src/export.js` have no DOM dependency, so they can be
-imported in Node, tested, or reused elsewhere.
+`src/state.js`, `src/export.js`, `src/i18n.js`, and `src/locale-loader.js`
+have no DOM dependency, so they can be imported in Node, tested, or reused
+elsewhere.
 
 ## Known issues
 

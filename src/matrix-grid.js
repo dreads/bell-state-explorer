@@ -1,4 +1,5 @@
 import { BASIS } from './state.js';
+import { interpolate } from './i18n.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -6,6 +7,20 @@ const PAD = 44;
 const CELL = 62;
 const SIZE = PAD + CELL * 4;
 const EPSILON = 0.004;
+
+// English defaults so this module works standalone (as the existing tests
+// rely on) even with no locale layer wired up. app.js passes the active
+// locale's resolved strings here on every draw() once one exists.
+const DEFAULT_STRINGS = {
+  svgTitle: 'Density matrix',
+  svgDescIntro:
+    'Four by four grid with the numeric value printed in every cell. Fill darkness also encodes magnitude, and a thin underline marks a negative entry.',
+  tableCaption: 'Density matrix values by row and column basis state',
+  entryTemplate: 'row {row} column {col} equals {value}',
+  summaryTemplate: 'Nonzero entries: {entries}.',
+  joinText: '; ',
+  allZero: 'All entries are zero.',
+};
 
 function el(name, attrs) {
   const node = document.createElementNS(SVG_NS, name);
@@ -52,12 +67,12 @@ function axisLabels(svg) {
  * visually-hidden HTML table is the accessible equivalent screen readers
  * actually navigate — same values, proper row/column <th scope> headers.
  */
-function buildMatrixTable() {
+function buildMatrixTable(strings) {
   const table = document.createElement('table');
   table.className = 'sr-only';
 
   const caption = document.createElement('caption');
-  caption.textContent = 'Density matrix values by row and column basis state';
+  caption.textContent = strings.tableCaption;
   table.appendChild(caption);
 
   const thead = document.createElement('thead');
@@ -75,7 +90,7 @@ function buildMatrixTable() {
   const tbody = document.createElement('tbody');
   table.appendChild(tbody);
 
-  return { table, tbody };
+  return { table, tbody, caption };
 }
 
 function renderMatrixRows(tbody, rho) {
@@ -124,12 +139,11 @@ export function createMatrixGrid(container) {
   });
 
   const title = el('title', {});
-  title.textContent = 'Density matrix';
+  title.textContent = DEFAULT_STRINGS.svgTitle;
   svg.appendChild(title);
 
   const desc = el('desc', {});
-  desc.textContent =
-    'Four by four grid with the numeric value printed in every cell. Fill darkness also encodes magnitude, and a thin underline marks a negative entry.';
+  desc.textContent = DEFAULT_STRINGS.svgDescIntro;
   svg.appendChild(desc);
 
   axisLabels(svg);
@@ -140,10 +154,12 @@ export function createMatrixGrid(container) {
   gridLines(svg);
   container.appendChild(svg);
 
-  const { table, tbody } = buildMatrixTable();
+  const { table, tbody, caption } = buildMatrixTable(DEFAULT_STRINGS);
   container.appendChild(table);
 
-  return function draw(rho) {
+  return function draw(rho, strings = DEFAULT_STRINGS) {
+    title.textContent = strings.svgTitle;
+    caption.textContent = strings.tableCaption;
     const frag = document.createDocumentFragment();
 
     for (let r = 0; r < 4; r += 1) {
@@ -201,18 +217,20 @@ export function createMatrixGrid(container) {
     }
 
     cells.replaceChildren(frag);
-    desc.textContent = describe(rho);
+    desc.textContent = describe(rho, strings);
     renderMatrixRows(tbody, rho);
   };
 }
 
-export function describe(rho) {
+export function describe(rho, strings = DEFAULT_STRINGS) {
   const parts = [];
   for (let r = 0; r < 4; r += 1) {
     for (let c = 0; c < 4; c += 1) {
       if (Math.abs(rho[r][c]) < EPSILON) continue;
-      parts.push(`row ${BASIS[r]} column ${BASIS[c]} equals ${rho[r][c].toFixed(2)}`);
+      parts.push(interpolate(strings.entryTemplate, { row: BASIS[r], col: BASIS[c], value: rho[r][c].toFixed(2) }));
     }
   }
-  return parts.length ? `Nonzero entries: ${parts.join('; ')}.` : 'All entries are zero.';
+  return parts.length
+    ? interpolate(strings.summaryTemplate, { entries: parts.join(strings.joinText) })
+    : strings.allZero;
 }

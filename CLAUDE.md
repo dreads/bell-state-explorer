@@ -20,15 +20,22 @@ src/bloch-sphere.js                      Bloch sphere SVG renderer + sr-only des
 src/circuit-diagram.js                   circuit diagram SVG renderer + sr-only description
 src/export.js                            builds the export payload — no DOM dependency
 src/i18n.js                              translate()/fallback lookup — no DOM dependency
+src/locale-loader.js                     locale discovery/fetch, fetch injectable — no DOM dependency
 src/app.js                               control wiring
 src/styles.css                           light/dark themes via CSS variables
-locales/en.js                            source-of-truth English string bundle (static import)
+locales/en.js                            source-of-truth English bundle (static import)
+locales/manifest.json                    picker option list only — not used for detection
+locales/qaa.json, qab.json, qac.json     mock/test-only locales, commented out by default
 schema/bell-state-export.schema.json     JSON Schema (draft 2020-12) for the export payload
+schema/locale-bundle.schema.json         JSON Schema (draft 2020-12) for PR-contributed locale bundles
+scripts/check-i18n-coverage.js           npm run lint:i18n — hardcoded-string scanner, wired into GHA
 test/state.test.js                       Node-runnable physics tests (incl. property-based invariants)
 test/matrix-grid.test.js                 tests for matrix-grid.js's pure math helpers
 test/bloch-sphere.test.js                tests for bloch-sphere.js's pure vector-math helpers
 test/export.test.js                      tests for export.js's payload shape and values
 test/i18n.test.js                        tests for i18n.js's lookup/fallback/interpolation
+test/locale-loader.test.js               tests for locale-loader.js (candidate expansion, fetch orchestration)
+test/locale-bundles.test.js              shape-validates every locales/*.json bundle
 ```
 
 ## Architecture
@@ -73,8 +80,9 @@ test/i18n.test.js                        tests for i18n.js's lookup/fallback/int
 - `render()` is the single update path: computes rho → draw → update all DOM readouts
 - Toggle buttons (q0/phase, q1/family) are coupled pairs writing the same two bits
 - The `#reading` interpretation text is `classifyState(...)` (state.js) piped
-  through `translate(activeLocale, en, ...)` (i18n.js) — see "Added: i18n
-  foundation" below before touching either
+  through `translate(activeLocale.strings, en.strings, ...)` (i18n.js)
+- `#locale-picker`, `applyLocale()`, `initLocale()` — see "Added: i18n
+  foundation" below before touching any of this
 
 ### styles.css
 - All colors via CSS custom properties (`--ink`, `--paper`, `--rule`, etc.)
@@ -182,36 +190,133 @@ rather than through a schema-validation library, since this project has no
 dependencies — keep that test in sync with the schema file, neither currently
 enforces the other automatically.
 
-## Added: i18n foundation (Phase 0)
+## Added: i18n foundation (Phase 0 + 1)
 
-This is the first slice of a larger internationalization/localization plan
-(full assessment and architecture proposal delivered as a report, not
-committed to this repo as a doc — ask if you need it re-summarized). Only
-what's described here is actually wired up today:
+Full assessment and architecture rationale delivered as a report, not
+committed to this repo as a doc — ask if you need it re-summarized. Only
+English ships as a maintained locale; **any other locale is contributed by
+PR** — this project has no live/user-submitted content pipeline, no
+"verified" vs "community" distinction, and no build step for locale files.
 
 - `state.js`'s `classifyState(...)` replaces the old `app.js` `interpret()`:
   same branching logic, but returns a key instead of composed English prose.
-- `locales/en.js` is the source-of-truth string bundle — currently just the
-  five `interpret.*` keys, holding byte-identical text to the old hardcoded
-  strings (verified by a DOM-stub regression check; nothing user-visible
-  changed).
+  `stateEquationBody({psi,negative})` splits the "(|00⟩ + |11⟩)/√2" half out
+  of `stateEquation()` so the bell-row list can display it separately.
+- **Every user-visible/accessibility-relevant string in the app is now
+  externalized** (not just `interpret.*`) — `locales/en.js`'s `strings` tree
+  has five namespaces: `interpret`, `ui` (static chrome + app.js's small
+  templates), `matrixGrid`, `blochSphere`, `circuitDiagram`. Math/ket
+  notation, basis labels (`00`/`01`/`10`/`11`), axis letters, gate labels
+  (`H`/`Ry`), and `q0`/`q1` identifiers stay hardcoded by design — they're
+  notation, not language. `STRINGS_VERSION` (bump on any shape change) is
+  exported for other bundles' `meta.targetsVersion` to reference —
+  informational only, never enforced at runtime.
+- `locales/en.js` ships as a static ES module import (not fetched), so the
+  default language costs no network round-trip and the first paint is never
+  blank.
+- **Static HTML text**: tag an element `data-i18n="namespace.key"` in
+  `index.html` and it's picked up automatically — no per-string JS wiring.
+  `app.js`'s `applyStaticText()` walks every `[data-i18n]` element plus
+  handles `document.title` and `meta[name="description"]` specially (they
+  don't use `textContent`). Called once in `init()` and again on every
+  `applyLocale()`. Elements whose text depends on model state (buttons,
+  readouts) are deliberately **not** tagged — they're driven by `render()`
+  via the `t(key, params)` helper instead, so the two mechanisms never touch
+  the same element.
+- `app.js`'s `t(key, params)` is a shorthand for
+  `translate(activeLocale.strings, en.strings, key, params)`;
+  `resolveStrings(namespace, keys)` resolves a flat key list into the
+  `{ key: text }` bag the three renderer modules' `draw()` functions expect.
+- **matrix-grid.js / bloch-sphere.js / circuit-diagram.js** each take an
+  optional `strings` parameter on their `draw()` (default = a `DEFAULT_STRINGS`
+  object with the current English text), so all three keep working
+  standalone — exactly how the existing tests call them — with zero locale
+  wiring. `app.js` always passes `resolveStrings(...)` explicitly. Templates
+  are filled with `i18n.js`'s `interpolate()` (imported directly — it's a
+  pure string helper with no DOM/locale coupling, so reusing it here doesn't
+  compromise these modules' independence). `matrix-grid.js`'s `describe()`
+  keeps its fragment-loop logic in code but now builds each fragment from
+  `strings.entryTemplate`/joins with `strings.joinText`/wraps with
+  `strings.summaryTemplate`, falling back to `strings.allZero` — the
+  branching logic stayed in JS, only the phrase templates moved to locale keys.
+- The four bell-row list items in `index.html` are empty `<span>`s populated
+  once at init by `populateBellRows()` from `stateLabel()`/`stateEquationBody()`
+  — no more hardcoded duplicate of what those functions already compute.
 - `src/i18n.js`'s `translate(bundle, fallbackBundle, key, params)` does a
   dot-path lookup with `{placeholder}` interpolation and **silent per-key
-  fallback** to `fallbackBundle` — this is the mechanism that lets a partial
-  or outdated third-party locale bundle keep working forever without the
-  maintainer touching it.
-- `app.js` has a single `activeLocale` const (currently always `en`) marked
-  as the seam where locale selection/loading will plug in later.
+  fallback** to `fallbackBundle` — a partial or outdated PR-contributed
+  bundle keeps working forever without maintainer intervention; it just
+  shows English for whatever key it doesn't have.
+- `src/locale-loader.js`: `expandCandidates(languages)` (pure — expands each
+  BCP-47 tag with its base language, e.g. `pt-BR` → `[pt-BR, pt]`) plus
+  `loadManifest`/`loadLocaleBundle`/`detectLocale` (async, `fetch` injectable
+  for testing). **`detectLocale` probes `locales/<code>.json` directly for
+  each candidate from `navigator.languages`, independent of the manifest** —
+  a bundle file copied straight into `locales/` on a local build is found
+  and used with zero manifest edits. `detectLocale` stops and returns `null`
+  (use `en`) as soon as `"en"` is reached in the candidate list.
+- `locales/manifest.json`: a flat array of `{ code, endonym, englishName }`.
+  This is **only** consulted to populate the language-picker's option list
+  (there's no directory-listing API on static hosting) — it plays no role in
+  auto-detection. Adding a locale via PR = add `locales/<code>.json` + one
+  array entry here. `loadManifest` (only this function) strips full-line
+  `//` comments before parsing, so entries can be toggled by hand — see the
+  mock locales below for the exact convention.
+- Three **mock/test-only** locales — `locales/{qaa,qab,qac}.json` — exist
+  for manual QA and are commented out in the manifest by default. `qaa`/`qab`
+  are complete bundles covering all five namespaces (`qaa` long/accented LTR
+  text to stress layout, `qab` `direction: "rtl"` with constructed
+  placeholder words to exercise dir-mirroring and the renderer sr-only
+  templates); `qac` is deliberately partial (a handful of `interpret`/`ui`
+  keys only) to demonstrate the per-key English fallback live in the
+  browser, now across namespaces, not just `interpret`. Codes use the
+  `qaa`–`qtz` range ISO 639-2 reserves for private/local use, so they can
+  never collide with a real contributed language. To try one: uncomment its
+  line in `locales/manifest.json`, restart `npm run serve`, hard-reload.
+- `schema/locale-bundle.schema.json` (draft 2020-12, same convention as the
+  export schema): validates a bundle's `meta`/`strings` shape. `strings.*`
+  properties are all optional (no `required` list) — a bundle is valid
+  whether complete or partial, by design.
+- `app.js`: `#locale-picker` `<select>` in `index.html`'s header.
+  `applyLocale(bundle)` sets `activeLocale`, `document.documentElement.lang`
+  /`.dir` from `bundle.meta`, adds a picker option if missing, and
+  re-renders. `initLocale()` runs after the first (English) render: resolves
+  a saved `localStorage` preference, else `detectLocale(navigator.languages)`,
+  and populates the picker from the manifest — all independently, so a slow
+  or failed fetch never blocks the initial paint.
+- `scripts/check-i18n-coverage.js` (`npm run lint:i18n`, zero dependencies,
+  wired into the GHA workflow after `npm test`): flags index.html text-bearing
+  tags without `data-i18n`/`data-i18n-exempt`, `<title>`/meta-description
+  drift from `locales/en.js`, `data-i18n` values that don't resolve to a real
+  key (typo catcher), and hardcoded `.textContent = "literal"` assignments in
+  `src/*.js`. It's a heuristic, not a parser — false positives get a
+  `data-i18n-exempt` next to the markup, not a script tweak.
+- `test/locale-bundles.test.js` hand-validates every `locales/*.json` (shape,
+  required meta, valid `direction`, no unknown section/key vs `locales/en.js`,
+  all-string values) — this is what "tested" means in the contribution
+  process below, enforced by `npm test`.
 
-**Not yet built** (proposed, not started): loading additional locale bundles
-(JSON, fetched on demand, vs. `en`'s static import), a `locales/manifest.json`
-discovery list, automatic `navigator.languages` detection + manual override,
-a language-picker control, a JSON Schema for locale bundle shape, the
-verified/community two-tier badge, `dir="rtl"`/logical-CSS-property work, or
-migrating the other composed-prose strings (`matrix-grid.js`'s `describe()`,
-`bloch-sphere.js`'s and `circuit-diagram.js`'s sr-only templates) to this
-same mechanism. Do not assume any of that exists — check before building on
-top of it.
+**Contributing a locale — two paths:**
+1. **Into the shipped app**: open a PR adding `locales/<code>.json` (validate
+   it by hand against `schema/locale-bundle.schema.json`) plus one entry in
+   `locales/manifest.json`. It must pass `npm test` (shape-checked by
+   `test/locale-bundles.test.js`) and `npm run lint:i18n`, and the contributor
+   should have manually verified it renders correctly locally (uncomment it,
+   `npm run serve`, check in a browser) before opening the PR — the maintainer
+   reviews the PR as code, not as a translation.
+2. **Local-only, no PR**: drop `locales/<code>.json` straight into a local
+   checkout's `locales/` folder. It's auto-detected if it matches a
+   `navigator.languages` preference (`detectLocale`, no manifest edit
+   needed), or reachable from the picker by adding one line to your own
+   local `locales/manifest.json`. This never touches the shared repo.
+
+**Not yet built**: `dir="rtl"`-driven CSS logical-property fixes (the
+`.slider-row output` / `.reading` physical properties, and the `.layout`
+3-column grid order — see the report), an LTR-lock wrapper for the matrix
+grid and circuit diagram SVGs, and `Intl.NumberFormat` at the display
+boundary. A "simple English" reading-level variant was considered and
+explicitly deferred, not built. Do not assume any of that exists — check
+before building on top of it.
 
 ## Planned extension directions
 
@@ -239,3 +344,15 @@ From README — areas where the codebase is designed to grow:
   group properties), in addition to fixed-value example tests.
 - No classes; module-level functions with explicit parameter objects
 - CSS classes named semantically (`.cell`, `.sign-bar`, `.tick`, `.readout`)
+- **Never hardcode a user-visible or accessibility-relevant string.** Every
+  such string goes through the i18n system: `data-i18n="namespace.key"` for
+  static HTML, `t(key, params)` (app.js) / `translate()`+`interpolate()`
+  (renderer modules) for anything computed at render time. This is exactly
+  as non-negotiable as the "100% test coverage on math" rule above — a
+  hardcoded string today is invisible dead weight for every future locale.
+  Genuinely non-translatable content (math/ket notation, `q0`/`q1`
+  identifiers, basis labels) is the one exception — mark it
+  `data-i18n-exempt` in HTML rather than leaving it silently untagged, so
+  the exemption is deliberate and discoverable, not indistinguishable from
+  an oversight. Run `npm run lint:i18n` before committing any UI change —
+  see "Added: i18n foundation" below for what it checks and its limits.

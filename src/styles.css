@@ -53,6 +53,26 @@ header {
   margin-bottom: 2rem;
 }
 
+.lang-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.lang-row select {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 0.25rem 0.4rem;
+}
+
 h1 {
   font-size: 1.5rem;
   font-weight: 500;
