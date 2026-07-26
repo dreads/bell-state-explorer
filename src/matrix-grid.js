@@ -17,7 +17,7 @@ function el(name, attrs) {
  * Fill opacity encodes magnitude. Floor of 0.10 keeps very small but nonzero
  * entries visible rather than fading into the background.
  */
-function magnitudeOpacity(value) {
+export function magnitudeOpacity(value) {
   return 0.1 + 0.52 * Math.min(1, Math.abs(value) / 0.5);
 }
 
@@ -126,7 +126,7 @@ export function createMatrixGrid(container) {
   };
 }
 
-function describe(rho) {
+export function describe(rho) {
   const parts = [];
   for (let r = 0; r < 4; r += 1) {
     for (let c = 0; c < 4; c += 1) {

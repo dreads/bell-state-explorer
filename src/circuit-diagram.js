@@ -8,6 +8,12 @@ const X_WIRE_START = 80;
 const X_H = 178;           // H gate centre
 const X_CNOT = 308;        // CNOT centre
 const X_WIRE_END = 630;
+// These four x-positions are kept in left-to-right circuit order (bracket <
+// out-label < Ry) so the diagram always reads as: gates that prepare the
+// Bell state, then the boundary marking it as complete, then the label,
+// then the optional local rotation that acts on it afterward. X_RY sits
+// well clear of X_BRACKET so the Ry gate never visually appears "inside"
+// the Bell-state preparation it is deliberately drawn outside of.
 const X_BRACKET = 415;     // Bell-state output bracket
 const X_OUT = 460;         // Bell-state label
 const X_RY = 555;          // Rᵧ gate centre (local rotation, after Bell state)

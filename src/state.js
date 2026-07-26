@@ -55,7 +55,12 @@ export function concurrence(rho) {
   return 2 * Math.abs(rho[i][j]);
 }
 
-/** Purity, Tr(rho^2). 1 for a pure state, 0.25 for maximally mixed. */
+/**
+ * Purity, Tr(rho^2). 1 for a pure state; 0.25 is the theoretical floor for any
+ * 4x4 density matrix, but this state family only ever populates two of the
+ * four diagonal entries, so the lowest purity actually reachable here is 0.5
+ * (full dephasing of an equal-population state).
+ */
 export function purity(rho) {
   let sum = 0;
   for (let r = 0; r < 4; r += 1) {
