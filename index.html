@@ -12,15 +12,15 @@
 
 <header>
   <div class="lang-row">
-    <label for="locale-picker">Language</label>
+    <label for="locale-picker" data-i18n="ui.languageLabel">Language</label>
     <select id="locale-picker">
       <option value="en">English</option>
     </select>
   </div>
-  <h1>Bell state density matrix</h1>
-  <h2 class="circuit-heading">Circuit diagram</h2>
+  <h1 data-i18n="ui.heading">Bell state density matrix</h1>
+  <h2 class="circuit-heading" data-i18n="ui.circuitHeading">Circuit diagram</h2>
   <div id="circuit-diagram"></div>
-  <p class="subtitle">
+  <p class="subtitle" data-i18n="ui.subtitle">
     Two qubits through a Hadamard and a CNOT. Set the input states by setting the qubit values or changing the phase and family, then watch the
     density matrix respond to dephasing and to an imbalance in the amplitudes.
   </p>
@@ -29,13 +29,13 @@
 <main>
 <div class="controls-row">
   <fieldset>
-    <legend>Input state</legend>
+    <legend data-i18n="ui.inputStateLegend">Input state</legend>
     <p class="state-line" id="state-label">|Φ⁺⟩</p>
     <div class="pair">
       <button type="button" id="q0" aria-pressed="false">q0 = 0</button>
       <button type="button" id="q1" aria-pressed="false">q1 = 0</button>
     </div>
-    <p class="coupling">↕ same two bits ↕</p>
+    <p class="coupling" data-i18n="ui.couplingNote">↕ same two bits ↕</p>
     <div class="pair">
       <button type="button" id="phase" aria-pressed="false">phase +</button>
       <button type="button" id="family" aria-pressed="false">Φ family</button>
@@ -43,30 +43,30 @@
   </fieldset>
 
   <fieldset class="channel-fieldset">
-    <legend>Channel</legend>
+    <legend data-i18n="ui.channelLegend">Channel</legend>
     <div class="slider-row">
-      <label for="dephasing">Dephasing</label>
+      <label for="dephasing" data-i18n="ui.dephasingLabel">Dephasing</label>
       <input type="range" id="dephasing" min="0" max="100" step="1" value="0">
       <output id="dephasing-value" for="dephasing">0%</output>
     </div>
     <div class="slider-row">
-      <label for="theta">Balance θ</label>
+      <label for="theta" data-i18n="ui.balanceLabel">Balance θ</label>
       <input type="range" id="theta" min="0" max="90" step="1" value="45">
       <output id="theta-value" for="theta">45°</output>
     </div>
     <div class="slider-row">
-      <label for="local-rotation">Rotate q0 α</label>
+      <label for="local-rotation" data-i18n="ui.rotateQ0Label">Rotate q0 α</label>
       <input type="range" id="local-rotation" min="0" max="360" step="1" value="0">
       <output id="local-rotation-value" for="local-rotation">0°</output>
     </div>
     <div class="slider-row">
-      <label for="local-rotation-1">Rotate q1 β</label>
+      <label for="local-rotation-1" data-i18n="ui.rotateQ1Label">Rotate q1 β</label>
       <input type="range" id="local-rotation-1" min="0" max="360" step="1" value="0">
       <output id="local-rotation-1-value" for="local-rotation-1">0°</output>
     </div>
     <div class="fieldset-actions">
-      <button type="button" id="reset" class="reset-btn">Reset</button>
-      <button type="button" id="export-state" class="reset-btn">Export current state</button>
+      <button type="button" id="reset" class="reset-btn" data-i18n="ui.resetButton">Reset</button>
+      <button type="button" id="export-state" class="reset-btn" data-i18n="ui.exportButton">Export current state</button>
     </div>
   </fieldset>
 </div>
@@ -77,22 +77,22 @@
   <div class="key">
     <span class="key-item">
       <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.62"/></svg>
-      large magnitude
+      <span data-i18n="ui.keyLargeMagnitude">large magnitude</span>
     </span>
     <span class="key-item">
       <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.26"/></svg>
-      small magnitude
+      <span data-i18n="ui.keySmallMagnitude">small magnitude</span>
     </span>
     <span class="key-item">
       <svg width="22" height="22" aria-hidden="true" class="gridlines"><rect x="0.5" y="0.5" width="21" height="21"/></svg>
-      zero
+      <span data-i18n="ui.keyZero">zero</span>
     </span>
     <span class="key-item">
       <svg width="22" height="22" aria-hidden="true"><rect width="22" height="22" class="cell" fill-opacity="0.62"/><rect x="4" y="16" width="14" height="3" class="sign-bar"/></svg>
-      negative
+      <span data-i18n="ui.keyNegative">negative</span>
     </span>
   </div>
-  <p>
+  <p data-i18n="ui.matrixKeyParagraph">
     Rows and columns run 00, 01, 10, 11. Diagonal entries are measurement
     probabilities; off-diagonal entries are coherences. Every cell shows its
     exact value; fill darkness and the underline are a visual summary of the
@@ -105,32 +105,32 @@
 <aside class="sidebar">
   <div class="readouts">
     <div class="readout">
-      <div class="label">Concurrence</div>
+      <div class="label" data-i18n="ui.concurrenceLabel">Concurrence</div>
       <div class="value" id="concurrence">1.00</div>
     </div>
     <div class="readout">
-      <div class="label">Purity</div>
+      <div class="label" data-i18n="ui.purityLabel">Purity</div>
       <div class="value" id="purity">1.00</div>
     </div>
   </div>
   <div class="bell-state-panel">
-    <div class="label">Bell state</div>
+    <div class="label" data-i18n="ui.bellStateLabel">Bell state</div>
     <div class="bell-state-list" id="bell-state-list">
       <div class="bell-row" data-state="phi-plus">
-        <span class="bell-ket">|Φ⁺⟩</span>
-        <span class="bell-eq">= (|00⟩ + |11⟩)/√2</span>
+        <span class="bell-ket"></span>
+        <span class="bell-eq"></span>
       </div>
       <div class="bell-row" data-state="phi-minus">
-        <span class="bell-ket">|Φ⁻⟩</span>
-        <span class="bell-eq">= (|00⟩ − |11⟩)/√2</span>
+        <span class="bell-ket"></span>
+        <span class="bell-eq"></span>
       </div>
       <div class="bell-row" data-state="psi-plus">
-        <span class="bell-ket">|Ψ⁺⟩</span>
-        <span class="bell-eq">= (|01⟩ + |10⟩)/√2</span>
+        <span class="bell-ket"></span>
+        <span class="bell-eq"></span>
       </div>
       <div class="bell-row" data-state="psi-minus">
-        <span class="bell-ket">|Ψ⁻⟩</span>
-        <span class="bell-eq">= (|01⟩ − |10⟩)/√2</span>
+        <span class="bell-ket"></span>
+        <span class="bell-eq"></span>
       </div>
     </div>
   </div>

@@ -1,3 +1,13 @@
 [
   { "code": "en", "endonym": "English", "englishName": "English" }
+
+  // Mock/test-only locales for manual QA. "qaa"-"qtz" is the range ISO
+  // 639-2 reserves for private/local use, so these codes can never collide
+  // with a real contributed language. To try one: delete the leading
+  // "// " from its line below, save, restart `npm run serve`, and
+  // hard-reload the page — it'll appear in the language picker.
+
+//   , { "code": "qaa", "endonym": "Pséüδô Löñg", "englishName": "Mock: long/accented (LTR)" }
+//   , { "code": "qab", "endonym": "Mock RTL", "englishName": "Mock: right-to-left" }
+//   , { "code": "qac", "endonym": "Partial", "englishName": "Mock: partial bundle (fallback test)" }
 ]

@@ -37,14 +37,35 @@ async function fetchJSON(url, fetchImpl) {
 }
 
 /**
+ * Strips full-line `//` comments (only when `//` is the first non-whitespace
+ * on the line, so it can never misfire on a value that merely contains
+ * "//" somewhere). Lets locales/manifest.json use ordinary JS-style
+ * comments to toggle entries by hand, even though JSON itself has no
+ * comment syntax — this file is a dev/maintainer toggle list, not
+ * contributed content, so it's the one place that convenience is worth it.
+ */
+function stripLineComments(text) {
+  return text
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n');
+}
+
+/**
  * Fetch locales/manifest.json — the list of locales offered in the language
  * picker. Returns [] on any failure (missing file, bad JSON, network error)
  * so a broken or absent manifest never breaks the app; the picker just ends
  * up offering only English.
  */
 export async function loadManifest(fetchImpl = fetch, url = 'locales/manifest.json') {
-  const manifest = await fetchJSON(url, fetchImpl);
-  return Array.isArray(manifest) ? manifest : [];
+  try {
+    const response = await fetchImpl(url);
+    if (!response.ok) return [];
+    const manifest = JSON.parse(stripLineComments(await response.text()));
+    return Array.isArray(manifest) ? manifest : [];
+  } catch {
+    return [];
+  }
 }
 
 /**

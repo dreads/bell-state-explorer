@@ -25,6 +25,7 @@ src/app.js                               control wiring
 src/styles.css                           light/dark themes via CSS variables
 locales/en.js                            source-of-truth English bundle (static import)
 locales/manifest.json                    picker option list only — not used for detection
+locales/qaa.json, qab.json, qac.json     mock/test-only locales, commented out by default
 schema/bell-state-export.schema.json     JSON Schema (draft 2020-12) for the export payload
 schema/locale-bundle.schema.json         JSON Schema (draft 2020-12) for PR-contributed locale bundles
 test/state.test.js                       Node-runnable physics tests (incl. property-based invariants)
@@ -197,12 +198,48 @@ PR** — this project has no live/user-submitted content pipeline, no
 
 - `state.js`'s `classifyState(...)` replaces the old `app.js` `interpret()`:
   same branching logic, but returns a key instead of composed English prose.
-- `locales/en.js` is the source-of-truth bundle: `{ meta: { code, endonym,
-  englishName, direction, targetsVersion }, strings: { interpret: {...} } }`.
-  Ships as a static ES module import (not fetched), so the default language
-  costs no network round-trip and the first paint is never blank.
-  `STRINGS_VERSION` is exported for other bundles' `meta.targetsVersion` to
-  reference — informational only, never enforced at runtime.
+  `stateEquationBody({psi,negative})` splits the "(|00⟩ + |11⟩)/√2" half out
+  of `stateEquation()` so the bell-row list can display it separately.
+- **Every user-visible/accessibility-relevant string in the app is now
+  externalized** (not just `interpret.*`) — `locales/en.js`'s `strings` tree
+  has five namespaces: `interpret`, `ui` (static chrome + app.js's small
+  templates), `matrixGrid`, `blochSphere`, `circuitDiagram`. Math/ket
+  notation, basis labels (`00`/`01`/`10`/`11`), axis letters, gate labels
+  (`H`/`Ry`), and `q0`/`q1` identifiers stay hardcoded by design — they're
+  notation, not language. `STRINGS_VERSION` (bump on any shape change) is
+  exported for other bundles' `meta.targetsVersion` to reference —
+  informational only, never enforced at runtime.
+- `locales/en.js` ships as a static ES module import (not fetched), so the
+  default language costs no network round-trip and the first paint is never
+  blank.
+- **Static HTML text**: tag an element `data-i18n="namespace.key"` in
+  `index.html` and it's picked up automatically — no per-string JS wiring.
+  `app.js`'s `applyStaticText()` walks every `[data-i18n]` element plus
+  handles `document.title` and `meta[name="description"]` specially (they
+  don't use `textContent`). Called once in `init()` and again on every
+  `applyLocale()`. Elements whose text depends on model state (buttons,
+  readouts) are deliberately **not** tagged — they're driven by `render()`
+  via the `t(key, params)` helper instead, so the two mechanisms never touch
+  the same element.
+- `app.js`'s `t(key, params)` is a shorthand for
+  `translate(activeLocale.strings, en.strings, key, params)`;
+  `resolveStrings(namespace, keys)` resolves a flat key list into the
+  `{ key: text }` bag the three renderer modules' `draw()` functions expect.
+- **matrix-grid.js / bloch-sphere.js / circuit-diagram.js** each take an
+  optional `strings` parameter on their `draw()` (default = a `DEFAULT_STRINGS`
+  object with the current English text), so all three keep working
+  standalone — exactly how the existing tests call them — with zero locale
+  wiring. `app.js` always passes `resolveStrings(...)` explicitly. Templates
+  are filled with `i18n.js`'s `interpolate()` (imported directly — it's a
+  pure string helper with no DOM/locale coupling, so reusing it here doesn't
+  compromise these modules' independence). `matrix-grid.js`'s `describe()`
+  keeps its fragment-loop logic in code but now builds each fragment from
+  `strings.entryTemplate`/joins with `strings.joinText`/wraps with
+  `strings.summaryTemplate`, falling back to `strings.allZero` — the
+  branching logic stayed in JS, only the phrase templates moved to locale keys.
+- The four bell-row list items in `index.html` are empty `<span>`s populated
+  once at init by `populateBellRows()` from `stateLabel()`/`stateEquationBody()`
+  — no more hardcoded duplicate of what those functions already compute.
 - `src/i18n.js`'s `translate(bundle, fallbackBundle, key, params)` does a
   dot-path lookup with `{placeholder}` interpolation and **silent per-key
   fallback** to `fallbackBundle` — a partial or outdated PR-contributed
@@ -220,7 +257,20 @@ PR** — this project has no live/user-submitted content pipeline, no
   This is **only** consulted to populate the language-picker's option list
   (there's no directory-listing API on static hosting) — it plays no role in
   auto-detection. Adding a locale via PR = add `locales/<code>.json` + one
-  array entry here.
+  array entry here. `loadManifest` (only this function) strips full-line
+  `//` comments before parsing, so entries can be toggled by hand — see the
+  mock locales below for the exact convention.
+- Three **mock/test-only** locales — `locales/{qaa,qab,qac}.json` — exist
+  for manual QA and are commented out in the manifest by default. `qaa`/`qab`
+  are complete bundles covering all five namespaces (`qaa` long/accented LTR
+  text to stress layout, `qab` `direction: "rtl"` with constructed
+  placeholder words to exercise dir-mirroring and the renderer sr-only
+  templates); `qac` is deliberately partial (a handful of `interpret`/`ui`
+  keys only) to demonstrate the per-key English fallback live in the
+  browser, now across namespaces, not just `interpret`. Codes use the
+  `qaa`–`qtz` range ISO 639-2 reserves for private/local use, so they can
+  never collide with a real contributed language. To try one: uncomment its
+  line in `locales/manifest.json`, restart `npm run serve`, hard-reload.
 - `schema/locale-bundle.schema.json` (draft 2020-12, same convention as the
   export schema): validates a bundle's `meta`/`strings` shape. `strings.*`
   properties are all optional (no `required` list) — a bundle is valid
@@ -236,11 +286,10 @@ PR** — this project has no live/user-submitted content pipeline, no
 **Not yet built**: `dir="rtl"`-driven CSS logical-property fixes (the
 `.slider-row output` / `.reading` physical properties, and the `.layout`
 3-column grid order — see the report), an LTR-lock wrapper for the matrix
-grid and circuit diagram SVGs, migrating `matrix-grid.js`'s `describe()` and
-the Bloch/circuit sr-only templates onto this same mechanism, and
-`Intl.NumberFormat` at the display boundary. A "simple English" reading-level
-variant was considered and explicitly deferred, not built. Do not assume any
-of that exists — check before building on top of it.
+grid and circuit diagram SVGs, and `Intl.NumberFormat` at the display
+boundary. A "simple English" reading-level variant was considered and
+explicitly deferred, not built. Do not assume any of that exists — check
+before building on top of it.
 
 ## Planned extension directions
 

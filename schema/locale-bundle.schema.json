@@ -54,6 +54,70 @@
             "pure-partial": { "type": "string" },
             "partially-dephased": { "type": "string" }
           }
+        },
+        "ui": {
+          "type": "object",
+          "description": "Static chrome plus small templates (index.html labels/buttons, app.js's qubit/degree/percent formatting). {placeholder} values like {qubit}, {sign}, {family} are literal notation (q0, +/-, Ψ/Φ) and are not themselves translated.",
+          "additionalProperties": false,
+          "properties": {
+            "docTitle": { "type": "string" },
+            "metaDescription": { "type": "string" },
+            "languageLabel": { "type": "string" },
+            "heading": { "type": "string" },
+            "circuitHeading": { "type": "string" },
+            "subtitle": { "type": "string" },
+            "inputStateLegend": { "type": "string" },
+            "couplingNote": { "type": "string" },
+            "channelLegend": { "type": "string" },
+            "dephasingLabel": { "type": "string" },
+            "balanceLabel": { "type": "string" },
+            "rotateQ0Label": { "type": "string" },
+            "rotateQ1Label": { "type": "string" },
+            "resetButton": { "type": "string" },
+            "exportButton": { "type": "string" },
+            "keyLargeMagnitude": { "type": "string" },
+            "keySmallMagnitude": { "type": "string" },
+            "keyZero": { "type": "string" },
+            "keyNegative": { "type": "string" },
+            "matrixKeyParagraph": { "type": "string" },
+            "concurrenceLabel": { "type": "string" },
+            "purityLabel": { "type": "string" },
+            "bellStateLabel": { "type": "string" },
+            "qubitEquals": { "type": "string", "description": "Template: {qubit}, {value}" },
+            "phaseSign": { "type": "string", "description": "Template: {sign}" },
+            "familyLabel": { "type": "string", "description": "Template: {family}" },
+            "degrees": { "type": "string", "description": "Template: {value}" },
+            "percent": { "type": "string", "description": "Template: {value}" }
+          }
+        },
+        "matrixGrid": {
+          "type": "object",
+          "description": "Density matrix SVG title/description and the sr-only table caption; entryTemplate/summaryTemplate/joinText/allZero together build the aria-hidden <desc> summary.",
+          "additionalProperties": false,
+          "properties": {
+            "svgTitle": { "type": "string" },
+            "svgDescIntro": { "type": "string" },
+            "tableCaption": { "type": "string" },
+            "entryTemplate": { "type": "string", "description": "Template: {row}, {col}, {value}" },
+            "summaryTemplate": { "type": "string", "description": "Template: {entries}" },
+            "joinText": { "type": "string" },
+            "allZero": { "type": "string" }
+          }
+        },
+        "blochSphere": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "origin": { "type": "string", "description": "Template: {qubit}" },
+            "vector": { "type": "string", "description": "Template: {qubit}, {x}, {y}, {z}, {magnitude}" }
+          }
+        },
+        "circuitDiagram": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "description": { "type": "string", "description": "Template: {q0}, {q1}, {label}, {alpha0}, {alpha1}" }
+          }
         }
       }
     }

@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "code": "qaa",
+    "endonym": "Pséüδô Löñg",
+    "englishName": "Mock: long/accented (LTR)",
+    "direction": "ltr",
+    "targetsVersion": "2"
+  },
+  "strings": {
+    "interpret": {
+      "fully-dephased": "Fûllý-déphâséd möde éngâgéd. Thé cöhérénçés hâvé cömplétélý évâpörâtéd, sö whât rémâins is â strîctlý clâssïcâl cörrélâtéd mïxtûré wîth éxâctlý thé sâmé méâsûrémént stâtîstïcs bût âbsölûtélý nö éntânglémént whâtsöévér.",
+      "product-state": "Âll öf thé âmplïtûdé sïts éntïrélý ûpön â sïnglé bâsïs stâté. Ìt is stïll â génûïnélý pürë stâté, büt ît is â prödûct stâté wîth âbsölûtélý nöthîng lëft tö éntânglé.",
+      "maximally-entangled": "Béhöld â mâxîmâllý éntânglëd Béll stâté. Éqûâl pöpûlâtîöns, füll cöhérénçé bétwéén thém, nö cävéâts whâtsöévér.",
+      "pure-partial": "Pürë, ýét öñlý pârtîâllý éntânglëd. Thé ûnéqûâl âmplïtûdés wéâkén thé cörrélâtîön wîthöüt îñtrödûcîng âñý mîxédñéss.",
+      "partially-dephased": "Pârtîâllý-déphâséd stâtûs cönfîrméd. Thé cöhérénçé térms hâvé shrûnk whîlé thé pöpûlâtîöns höld stéâdý, sö éntânglémént is décâýîng töwârd â clâssïcâl mîxtûré."
+    },
+    "ui": {
+      "docTitle": "Béll stâté déñsîtý mâtrîx éxplörér, ëxtêndêd ëdïtîön",
+      "metaDescription": "Àn ïntéráctïvé gréýscâlé déñsîtý mâtrîx för thé föür Béll stâtés, wîth déphâsîng ánd âmplïtûdé bâlâncé cöntröls, éxplâïñéd át grëât léngth.",
+      "languageLabel": "Löñgüâgé",
+      "heading": "Béll stâté déñsîtý mâtrîx",
+      "circuitHeading": "Cîrcüït dïâgrâm",
+      "subtitle": "Twö qübïts thröügh â Hâdâmârd ánd â CNOT. Sét thé ïnpüt stâtés bý séttîng thé qübït válüés ör chángîng thé phâsé ánd fâmïlý, thén wâtch thé déñsîtý mâtrîx réspönd tö déphâsîng ánd tö án ïmbâlâncé ïn thé âmplïtûdés.",
+      "inputStateLegend": "Ïnpüt stâté",
+      "couplingNote": "↕ sâmé twö bïts ↕",
+      "channelLegend": "Chânnél",
+      "dephasingLabel": "Déphâsîng",
+      "balanceLabel": "Bâlâncé θ",
+      "rotateQ0Label": "Rötâté q0 α",
+      "rotateQ1Label": "Rötâté q1 β",
+      "resetButton": "Rését",
+      "exportButton": "Éxpört cürrént stâté",
+      "keyLargeMagnitude": "lârgé mâgñïtûdé",
+      "keySmallMagnitude": "smâll mâgñïtûdé",
+      "keyZero": "zérö",
+      "keyNegative": "négâtîvé",
+      "matrixKeyParagraph": "Röws ánd cölümñs rün 00, 01, 10, 11. Dîâgönâl éñtrîés âré méâsûrémént pröbâbïlïtîés; öff-dîâgönâl éñtrîés âré cöhérénçés. Évérý céll shöws ïts éxâct válûé; fïll dârkñéss ánd thé üñdérlîné âré â vïsûâl sûmmârý öf thé sâmé nümbérs för â qüïck scân.",
+      "concurrenceLabel": "Cöñcürrénçé",
+      "purityLabel": "Pürîtý",
+      "bellStateLabel": "Béll stâté",
+      "qubitEquals": "{qubit} = {value}",
+      "phaseSign": "phâsé {sign}",
+      "familyLabel": "{family} fâmïlý",
+      "degrees": "{value}°",
+      "percent": "{value}%"
+    },
+    "matrixGrid": {
+      "svgTitle": "Déñsîtý mâtrîx",
+      "svgDescIntro": "Föür bý föür grîd wîth thé nümérîc válûé prîntéd ïn évérý céll. Fïll dârkñéss âlsö éñcödés mâgñïtûdé, ánd â thîn üñdérlîné mârks â négâtîvé éñtrý.",
+      "tableCaption": "Déñsîtý mâtrîx válûés bý röw ánd cölümñ bâsïs stâté",
+      "entryTemplate": "röw {row} cölümñ {col} éqüâls {value}",
+      "summaryTemplate": "Nönzérö éñtrîés: {entries}.",
+      "joinText": "; ",
+      "allZero": "Àll éñtrîés âré zérö."
+    },
+    "blochSphere": {
+      "origin": "Blöch vëctör för {qubit}: át thé örîgîn (mâxîmâllý mïxéd, nö ïnförmâtîön âböüt thîs qübït âlöné).",
+      "vector": "Blöch vëctör för {qubit}: x = {x}, y = {y}, z = {z}, mâgñïtûdé = {magnitude}."
+    },
+    "circuitDiagram": {
+      "description": "Cîrcüït: q0 stârts át |{q0}⟩ ánd q1 stârts át |{q1}⟩. À Hâdâmârd gâté ön q0 is föllöwéd bý â CNOT wîth q0 âs cöñtröl ánd q1 âs târgét, préparîng thé Béll stâté {label}. Àftér thât, án Rᵧ rötâtîön öf {alpha0} dégréés is âpplîéd tö q0 ánd {alpha1} dégréés tö q1."
+    }
+  }
+}

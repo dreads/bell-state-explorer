@@ -111,15 +111,24 @@ export function stateLabel({ psi, negative }) {
 }
 
 /**
+ * Right-hand side of the canonical Dirac equation, e.g. "(|00⟩ + |11⟩)/√2" —
+ * split out from stateEquation() so callers that already display the ket
+ * label separately (the bell-row list in index.html) don't have to parse it
+ * back out of the combined string.
+ */
+export function stateEquationBody({ psi, negative }) {
+  const [first, second] = psi ? ['01', '10'] : ['00', '11'];
+  const sign = negative ? '−' : '+';
+  return `(|${first}⟩ ${sign} |${second}⟩)/√2`;
+}
+
+/**
  * Full Dirac equation for a Bell state, canonical (equal-superposition) form.
  * Independent of theta/dephasing — this names which of the four Bell states
  * the input bits select, not the current (possibly imbalanced or mixed) rho.
  */
 export function stateEquation({ psi, negative }) {
-  const label = stateLabel({ psi, negative });
-  const [first, second] = psi ? ['01', '10'] : ['00', '11'];
-  const sign = negative ? '−' : '+';
-  return `${label} = (|${first}⟩ ${sign} |${second}⟩)/√2`;
+  return `${stateLabel({ psi, negative })} = ${stateEquationBody({ psi, negative })}`;
 }
 
 /** Reduced 2×2 density matrix for qubit 0 (trace out qubit 1). */

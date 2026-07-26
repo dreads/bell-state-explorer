@@ -22,7 +22,7 @@ function fakeFetch(routes) {
   return async (url) => {
     if (!(url in routes)) return { ok: false };
     const body = routes[url];
-    return { ok: true, json: async () => body };
+    return { ok: true, json: async () => body, text: async () => JSON.stringify(body) };
   };
 }
 
@@ -43,6 +43,38 @@ test('loadManifest returns [] when the file is not a JSON array', async () => {
 
 test('loadManifest returns [] when fetch itself throws', async () => {
   const fetchImpl = async () => { throw new Error('network down'); };
+  assert.deepEqual(await loadManifest(fetchImpl), []);
+});
+
+test('loadManifest strips full-line // comments before parsing', async () => {
+  const raw = [
+    '[',
+    '  { "code": "en", "endonym": "English", "englishName": "English" }',
+    '  // , { "code": "qaa", "endonym": "Mock", "englishName": "Mock" }',
+    ']',
+  ].join('\n');
+  const fetchImpl = async () => ({ ok: true, text: async () => raw });
+  const manifest = await loadManifest(fetchImpl);
+  assert.deepEqual(manifest, [{ code: 'en', endonym: 'English', englishName: 'English' }]);
+});
+
+test('loadManifest leaves an uncommented entry\'s leading comma intact', async () => {
+  const raw = [
+    '[',
+    '  { "code": "en", "endonym": "English", "englishName": "English" }',
+    '  , { "code": "qaa", "endonym": "Mock", "englishName": "Mock" }',
+    ']',
+  ].join('\n');
+  const fetchImpl = async () => ({ ok: true, text: async () => raw });
+  const manifest = await loadManifest(fetchImpl);
+  assert.deepEqual(manifest, [
+    { code: 'en', endonym: 'English', englishName: 'English' },
+    { code: 'qaa', endonym: 'Mock', englishName: 'Mock' },
+  ]);
+});
+
+test('loadManifest returns [] when a comment doesn\'t fully hide invalid JSON', async () => {
+  const fetchImpl = async () => ({ ok: true, text: async () => '{ this is not json' });
   assert.deepEqual(await loadManifest(fetchImpl), []);
 });
 
