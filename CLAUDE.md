@@ -28,12 +28,14 @@ locales/manifest.json                    picker option list only — not used fo
 locales/qaa.json, qab.json, qac.json     mock/test-only locales, commented out by default
 schema/bell-state-export.schema.json     JSON Schema (draft 2020-12) for the export payload
 schema/locale-bundle.schema.json         JSON Schema (draft 2020-12) for PR-contributed locale bundles
+scripts/check-i18n-coverage.js           npm run lint:i18n — hardcoded-string scanner, wired into GHA
 test/state.test.js                       Node-runnable physics tests (incl. property-based invariants)
 test/matrix-grid.test.js                 tests for matrix-grid.js's pure math helpers
 test/bloch-sphere.test.js                tests for bloch-sphere.js's pure vector-math helpers
 test/export.test.js                      tests for export.js's payload shape and values
 test/i18n.test.js                        tests for i18n.js's lookup/fallback/interpolation
 test/locale-loader.test.js               tests for locale-loader.js (candidate expansion, fetch orchestration)
+test/locale-bundles.test.js              shape-validates every locales/*.json bundle
 ```
 
 ## Architecture
@@ -282,6 +284,31 @@ PR** — this project has no live/user-submitted content pipeline, no
   a saved `localStorage` preference, else `detectLocale(navigator.languages)`,
   and populates the picker from the manifest — all independently, so a slow
   or failed fetch never blocks the initial paint.
+- `scripts/check-i18n-coverage.js` (`npm run lint:i18n`, zero dependencies,
+  wired into the GHA workflow after `npm test`): flags index.html text-bearing
+  tags without `data-i18n`/`data-i18n-exempt`, `<title>`/meta-description
+  drift from `locales/en.js`, `data-i18n` values that don't resolve to a real
+  key (typo catcher), and hardcoded `.textContent = "literal"` assignments in
+  `src/*.js`. It's a heuristic, not a parser — false positives get a
+  `data-i18n-exempt` next to the markup, not a script tweak.
+- `test/locale-bundles.test.js` hand-validates every `locales/*.json` (shape,
+  required meta, valid `direction`, no unknown section/key vs `locales/en.js`,
+  all-string values) — this is what "tested" means in the contribution
+  process below, enforced by `npm test`.
+
+**Contributing a locale — two paths:**
+1. **Into the shipped app**: open a PR adding `locales/<code>.json` (validate
+   it by hand against `schema/locale-bundle.schema.json`) plus one entry in
+   `locales/manifest.json`. It must pass `npm test` (shape-checked by
+   `test/locale-bundles.test.js`) and `npm run lint:i18n`, and the contributor
+   should have manually verified it renders correctly locally (uncomment it,
+   `npm run serve`, check in a browser) before opening the PR — the maintainer
+   reviews the PR as code, not as a translation.
+2. **Local-only, no PR**: drop `locales/<code>.json` straight into a local
+   checkout's `locales/` folder. It's auto-detected if it matches a
+   `navigator.languages` preference (`detectLocale`, no manifest edit
+   needed), or reachable from the picker by adding one line to your own
+   local `locales/manifest.json`. This never touches the shared repo.
 
 **Not yet built**: `dir="rtl"`-driven CSS logical-property fixes (the
 `.slider-row output` / `.reading` physical properties, and the `.layout`
@@ -317,3 +344,15 @@ From README — areas where the codebase is designed to grow:
   group properties), in addition to fixed-value example tests.
 - No classes; module-level functions with explicit parameter objects
 - CSS classes named semantically (`.cell`, `.sign-bar`, `.tick`, `.readout`)
+- **Never hardcode a user-visible or accessibility-relevant string.** Every
+  such string goes through the i18n system: `data-i18n="namespace.key"` for
+  static HTML, `t(key, params)` (app.js) / `translate()`+`interpolate()`
+  (renderer modules) for anything computed at render time. This is exactly
+  as non-negotiable as the "100% test coverage on math" rule above — a
+  hardcoded string today is invisible dead weight for every future locale.
+  Genuinely non-translatable content (math/ket notation, `q0`/`q1`
+  identifiers, basis labels) is the one exception — mark it
+  `data-i18n-exempt` in HTML rather than leaving it silently untagged, so
+  the exemption is deliberate and discoverable, not indistinguishable from
+  an oversight. Run `npm run lint:i18n` before committing any UI change —
+  see "Added: i18n foundation" below for what it checks and its limits.

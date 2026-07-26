@@ -23,6 +23,7 @@ jobs:
         with:
           node-version: '20'
       - run: npm test
+      - run: npm run lint:i18n
 
   deploy:
     needs: test

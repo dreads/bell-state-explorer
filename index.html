@@ -14,7 +14,9 @@
   <div class="lang-row">
     <label for="locale-picker" data-i18n="ui.languageLabel">Language</label>
     <select id="locale-picker">
-      <option value="en">English</option>
+      <!-- Self-referential language name (like every other bundle's own
+           endonym), not translated content — exempt from i18n-coverage scan -->
+      <option value="en" data-i18n-exempt>English</option>
     </select>
   </div>
   <h1 data-i18n="ui.heading">Bell state density matrix</h1>
@@ -32,13 +34,17 @@
     <legend data-i18n="ui.inputStateLegend">Input state</legend>
     <p class="state-line" id="state-label">|Φ⁺⟩</p>
     <div class="pair">
-      <button type="button" id="q0" aria-pressed="false">q0 = 0</button>
-      <button type="button" id="q1" aria-pressed="false">q1 = 0</button>
+      <button type="button" id="q0" aria-pressed="false"></button>
+      <button type="button" id="q1" aria-pressed="false"></button>
     </div>
     <p class="coupling" data-i18n="ui.couplingNote">↕ same two bits ↕</p>
     <div class="pair">
-      <button type="button" id="phase" aria-pressed="false">phase +</button>
-      <button type="button" id="family" aria-pressed="false">Φ family</button>
+      <!-- q0/q1/phase/family button text is entirely JS-managed (app.js's
+           setPair(), tokenized via ui.qubitEquals/ui.phaseSign/ui.familyLabel)
+           and set synchronously on the first render() call in init(), so
+           these start empty rather than carrying stale hardcoded English. -->
+      <button type="button" id="phase" aria-pressed="false"></button>
+      <button type="button" id="family" aria-pressed="false"></button>
     </div>
   </fieldset>
 
