@@ -46,6 +46,56 @@ function axisLabels(svg) {
   });
 }
 
+/**
+ * The SVG grid is marked aria-hidden (see createMatrixGrid) because a 16-cell
+ * fill-opacity heatmap has no meaningful native ARIA table semantics. This
+ * visually-hidden HTML table is the accessible equivalent screen readers
+ * actually navigate — same values, proper row/column <th scope> headers.
+ */
+function buildMatrixTable() {
+  const table = document.createElement('table');
+  table.className = 'sr-only';
+
+  const caption = document.createElement('caption');
+  caption.textContent = 'Density matrix values by row and column basis state';
+  table.appendChild(caption);
+
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  headRow.appendChild(document.createElement('th'));
+  BASIS.forEach((label) => {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.textContent = label;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  table.appendChild(tbody);
+
+  return { table, tbody };
+}
+
+function renderMatrixRows(tbody, rho) {
+  const frag = document.createDocumentFragment();
+  BASIS.forEach((rowLabel, r) => {
+    const tr = document.createElement('tr');
+    const th = document.createElement('th');
+    th.scope = 'row';
+    th.textContent = rowLabel;
+    tr.appendChild(th);
+    BASIS.forEach((_, c) => {
+      const td = document.createElement('td');
+      td.textContent = rho[r][c].toFixed(2);
+      tr.appendChild(td);
+    });
+    frag.appendChild(tr);
+  });
+  tbody.replaceChildren(frag);
+}
+
 function gridLines(svg) {
   const g = el('g', { class: 'gridlines' });
   g.appendChild(el('rect', { x: PAD, y: PAD, width: CELL * 4, height: CELL * 4 }));
@@ -66,6 +116,11 @@ export function createMatrixGrid(container) {
     viewBox: `0 0 ${SIZE} ${SIZE}`,
     width: '100%',
     role: 'img',
+    // A 16-cell fill-opacity heatmap doesn't translate to useful ARIA
+    // semantics on its own; the sr-only <table> built below is the real
+    // accessible path, so the visual is hidden from the accessibility tree
+    // to avoid a screen reader announcing raw SVG structure instead.
+    'aria-hidden': 'true',
   });
 
   const title = el('title', {});
@@ -74,7 +129,7 @@ export function createMatrixGrid(container) {
 
   const desc = el('desc', {});
   desc.textContent =
-    'Four by four grid. Fill darkness encodes the magnitude of each entry; a knocked-out bar marks a negative entry; blank cells are zero.';
+    'Four by four grid with the numeric value printed in every cell. Fill darkness also encodes magnitude, and a thin underline marks a negative entry.';
   svg.appendChild(desc);
 
   axisLabels(svg);
@@ -85,44 +140,69 @@ export function createMatrixGrid(container) {
   gridLines(svg);
   container.appendChild(svg);
 
+  const { table, tbody } = buildMatrixTable();
+  container.appendChild(table);
+
   return function draw(rho) {
     const frag = document.createDocumentFragment();
 
     for (let r = 0; r < 4; r += 1) {
       for (let c = 0; c < 4; c += 1) {
         const value = rho[r][c];
-        if (Math.abs(value) < EPSILON) continue;
-
         const x = PAD + CELL * c;
         const y = PAD + CELL * r;
 
-        frag.appendChild(
-          el('rect', {
-            x,
-            y,
-            width: CELL,
-            height: CELL,
-            class: 'cell',
-            'fill-opacity': magnitudeOpacity(value).toFixed(3),
-          })
-        );
-
-        if (value < 0) {
+        if (Math.abs(value) >= EPSILON) {
           frag.appendChild(
             el('rect', {
-              x: x + CELL * 0.24,
-              y: y + CELL * 0.44,
-              width: CELL * 0.52,
-              height: CELL * 0.13,
-              class: 'sign-bar',
+              x,
+              y,
+              width: CELL,
+              height: CELL,
+              class: 'cell',
+              'fill-opacity': magnitudeOpacity(value).toFixed(3),
             })
           );
+
+          if (value < 0) {
+            // A thin underline near the cell's bottom edge, independent of the
+            // centered value label above it, so a negative sign is visible
+            // without relying on reading the text (colorblind/low-vision cue).
+            frag.appendChild(
+              el('rect', {
+                x: x + CELL * 0.25,
+                y: y + CELL * 0.74,
+                width: CELL * 0.5,
+                height: CELL * 0.08,
+                class: 'sign-bar',
+              })
+            );
+          }
         }
+
+        // Text color must stay legible against its own cell's fill, which
+        // ranges from near-paper (opacity 0.1) to a medium tint (opacity
+        // 0.62, never full ink). Switching at the 0.5 mark keeps contrast
+        // above ~4:1 across that whole range (see README Accessibility).
+        const useInk = magnitudeOpacity(value) <= 0.5;
+        frag.appendChild(
+          Object.assign(
+            el('text', {
+              x: x + CELL / 2,
+              y: y + CELL / 2,
+              'text-anchor': 'middle',
+              'dominant-baseline': 'central',
+              class: `cell-value ${useInk ? 'cell-value-ink' : 'cell-value-paper'}`,
+            }),
+            { textContent: value.toFixed(2) }
+          )
+        );
       }
     }
 
     cells.replaceChildren(frag);
     desc.textContent = describe(rho);
+    renderMatrixRows(tbody, rho);
   };
 }
 

@@ -45,8 +45,10 @@ export function createCircuitDiagram(container) {
     viewBox: `0 0 ${W} ${H}`,
     width: '100%',
     class: 'circuit-svg',
-    role: 'img',
-    'aria-label': 'H + CNOT quantum circuit with local rotation on q0',
+    // A gate diagram's meaning comes from left-to-right spatial layout,
+    // which doesn't survive translation to ARIA roles; the sr-only
+    // paragraph below (updated in draw()) is the accessible equivalent.
+    'aria-hidden': 'true',
   });
 
   // Wires
@@ -122,6 +124,12 @@ export function createCircuitDiagram(container) {
 
   container.appendChild(svg);
 
+  const description = document.createElement('p');
+  description.className = 'sr-only';
+  container.appendChild(description);
+
+  const toDegrees = (radians) => Math.round((radians * 180) / Math.PI);
+
   return function draw({ q0, q1, label, alpha0, alpha1 }) {
     inLabel0.textContent = `|${q0}⟩`;
     inLabel1.textContent = `|${q1}⟩`;
@@ -129,5 +137,12 @@ export function createCircuitDiagram(container) {
     // Dim each Ry gate when its angle is zero (acting as identity)
     ryGroup0.setAttribute('opacity', Math.abs(alpha0) < 0.005 ? '0.28' : '1');
     ryGroup1.setAttribute('opacity', Math.abs(alpha1) < 0.005 ? '0.28' : '1');
+
+    description.textContent =
+      `Circuit: q0 starts at |${q0}⟩ and q1 starts at |${q1}⟩. ` +
+      `A Hadamard gate on q0 is followed by a CNOT with q0 as control and ` +
+      `q1 as target, preparing the Bell state ${label}. ` +
+      `After that, an Rᵧ rotation of ${toDegrees(alpha0)} degrees is applied ` +
+      `to q0 and ${toDegrees(alpha1)} degrees to q1.`;
   };
 }

@@ -13,16 +13,19 @@ npm test        # 12 physics unit tests
 ## File structure
 
 ```
-index.html                 markup and controls
-src/state.js                physics core — no DOM dependency
-src/matrix-grid.js          SVG renderer
-src/bloch-sphere.js         Bloch sphere SVG renderer
-src/circuit-diagram.js      circuit diagram SVG renderer
-src/app.js                  control wiring
-src/styles.css              light/dark themes via CSS variables
-test/state.test.js          Node-runnable physics tests (incl. property-based invariants)
-test/matrix-grid.test.js    tests for matrix-grid.js's pure math helpers
-test/bloch-sphere.test.js   tests for bloch-sphere.js's pure vector-math helpers
+index.html                              markup and controls
+src/state.js                             physics core — no DOM dependency
+src/matrix-grid.js                       SVG renderer + sr-only accessible table
+src/bloch-sphere.js                      Bloch sphere SVG renderer + sr-only description
+src/circuit-diagram.js                   circuit diagram SVG renderer + sr-only description
+src/export.js                            builds the export payload — no DOM dependency
+src/app.js                               control wiring
+src/styles.css                           light/dark themes via CSS variables
+schema/bell-state-export.schema.json     JSON Schema (draft 2020-12) for the export payload
+test/state.test.js                       Node-runnable physics tests (incl. property-based invariants)
+test/matrix-grid.test.js                 tests for matrix-grid.js's pure math helpers
+test/bloch-sphere.test.js                tests for bloch-sphere.js's pure vector-math helpers
+test/export.test.js                      tests for export.js's payload shape and values
 ```
 
 ## Architecture
@@ -41,7 +44,19 @@ test/bloch-sphere.test.js   tests for bloch-sphere.js's pure vector-math helpers
 - `createMatrixGrid(container)` — builds SVG scaffolding (axis labels, grid lines) once
 - Returns `draw(rho)` function — only redraws cells (efficient for slider drags)
 - `magnitudeOpacity(value)` → `0.1 + 0.52 * min(1, |v|/0.5)` — floor keeps tiny values visible
-- Negative entries get a `sign-bar` rect knocked out of the cell fill
+- Every cell gets a printed numeric value (`.cell-value`, 2 decimals), all 16
+  cells, not just nonzero ones. Text fill switches ink/paper at
+  `magnitudeOpacity(value) <= 0.5` to stay legible against the cell's own
+  fill — see the README Accessibility section for the contrast math behind
+  that threshold before changing it.
+- Negative entries additionally get a `sign-bar` underline near the cell's
+  bottom edge (moved there so it doesn't collide with the centered value text)
+- The SVG is `aria-hidden="true"`: a 16-cell opacity heatmap has no useful
+  native ARIA semantics. The accessible equivalent is a visually-hidden
+  (`.sr-only`) `<table>` built by `buildMatrixTable`/`renderMatrixRows` in the
+  same file, with proper `<th scope="row">`/`<th scope="col">` headers,
+  updated every `draw()` call. Any new SVG visual added to this project should
+  follow the same pattern (see README Accessibility).
 - `magnitudeOpacity` and `describe` are exported (in addition to `createMatrixGrid`)
   specifically so their math/formatting logic gets direct unit tests, per the
   100%-math-coverage rule below — see `test/matrix-grid.test.js`
@@ -84,6 +99,10 @@ Basis order in rows/cols: 00, 01, 10, 11 (indices 0–3).
   exported alongside `createBlochSpheres` so they get direct unit tests
   (`test/bloch-sphere.test.js`) without needing a DOM — same rationale as
   `matrix-grid.js`'s exported helpers above
+- Each sphere's `<svg>` is `aria-hidden="true"`; a `.sr-only` paragraph per
+  qubit (updated every `draw()` call) states rx/ry/rz numerically — same
+  aria-hidden + sr-only-equivalent pattern as `matrix-grid.js` (see README
+  Accessibility)
 
 ## Added: Local rotation (Ry gate)
 
@@ -103,6 +122,56 @@ Circuit diagram: Ry gate group dims to opacity 0.28 when alpha≈0 (identity). D
 Slider: `#local-rotation` 0–360°, model stores radians. `#local-rotation-value` shows degrees.
 
 Key physics: at θ=45° (maximal entanglement), Bloch vectors don't move regardless of α. Below 45°, q0's Bloch vector sweeps the x-z plane.
+
+### circuit-diagram.js
+- `createCircuitDiagram(container)` — builds the static H + CNOT + Rᵧ⊗Rᵧ gate
+  layout once. Returns `draw({ q0, q1, label, alpha0, alpha1 })`, called every
+  render with the current input bits, Bell-state label, and both rotation
+  angles (radians)
+- Ry gate groups dim to opacity 0.28 when their angle is ~0 (acting as identity)
+- `<svg>` is `aria-hidden="true"`; a `.sr-only` paragraph (updated every
+  `draw()` call) states the same information in prose, converting the
+  rotation angles to degrees to match the visible slider readouts
+
+## Added: Accessibility (aria-hidden + sr-only pattern)
+
+Target is WCAG 2.2 AA (full rationale in README's Accessibility section — read
+that before changing anything here). The convention every SVG visual in this
+project follows:
+
+- The `<svg>` itself gets `aria-hidden="true"` — spatial/visual encodings
+  (fill opacity, vector orientation, gate position) have no faithful ARIA
+  mapping, so don't attempt one.
+- A plain-language equivalent (a `.sr-only` `<table>` for the matrix grid, a
+  `.sr-only` `<p>` per Bloch sphere, a `.sr-only` `<p>` for the circuit
+  diagram) is rendered alongside it and updated every `draw()` call.
+- None of these are `aria-live` — they're available on navigation, not
+  announced on every slider tick (matches `#grid`'s existing `aria-live="off"`).
+  The one exception is `#reading` (`role="status"`), a deliberate concise
+  live summary.
+- **Any new SVG visual added to this project must follow this same pattern.**
+- The matrix grid's per-cell text color (ink vs. paper) switches at
+  `magnitudeOpacity(value) <= 0.5`, derived from an actual WCAG contrast
+  calculation against this app's `--ink`/`--paper` tokens — recheck that
+  threshold if those tokens change (see README for the numbers).
+
+## Added: State export (JSON Schema)
+
+`src/export.js` — `buildExportPayload(model, now = new Date())`, pure/no-DOM.
+Assembles settings (radians, matching `state.js`'s own convention) plus every
+derived measurement (density matrix, concurrence, purity, outcome
+probabilities, both Bloch vectors, Bell-state label/equation) into an object
+conforming to `schema/bell-state-export.schema.json` (JSON Schema draft
+2020-12). `SCHEMA_VERSION`/`SCHEMA_URL` are exported constants; bump
+`SCHEMA_VERSION` and the schema file together on any breaking shape change.
+
+`#export-state` button in `index.html` (next to Reset); `app.js`'s
+`exportState()` calls `buildExportPayload(model)` and triggers a download via
+Blob + a temporary anchor — browser-only, not unit tested. The payload shape
+itself is checked in `test/export.test.js` by hand (exact key sets and types)
+rather than through a schema-validation library, since this project has no
+dependencies — keep that test in sync with the schema file, neither currently
+enforces the other automatically.
 
 ## Planned extension directions
 

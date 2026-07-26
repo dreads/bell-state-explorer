@@ -14,6 +14,7 @@ import {
 import { createMatrixGrid } from './matrix-grid.js';
 import { createBlochSpheres } from './bloch-sphere.js';
 import { createCircuitDiagram } from './circuit-diagram.js';
+import { buildExportPayload } from './export.js';
 
 const model = {
   q0: 0,
@@ -53,6 +54,7 @@ function query() {
     'local-rotation-1',
     'local-rotation-1-value',
     'reset',
+    'export-state',
   ].forEach((id) => {
     dom[id] = document.getElementById(id);
   });
@@ -147,6 +149,26 @@ function render() {
   drawCircuit({ q0: model.q0, q1: model.q1, label, alpha0: model.rotation0, alpha1: model.rotation1 });
 }
 
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function exportState() {
+  const payload = buildExportPayload(model);
+  const { psi, negative } = bellFromInput(model.q0, model.q1);
+  const bellKey = `${psi ? 'psi' : 'phi'}-${negative ? 'minus' : 'plus'}`;
+  const timestamp = payload.exportedAt.replace(/[:.]/g, '-');
+  downloadJson(`bell-state-${bellKey}-${timestamp}.json`, payload);
+}
+
 function init() {
   query();
   draw = createMatrixGrid(dom.grid);
@@ -178,6 +200,8 @@ function init() {
     model.rotation1 = (Number(e.target.value) * Math.PI) / 180;
     render();
   });
+
+  dom['export-state'].addEventListener('click', exportState);
 
   dom.reset.addEventListener('click', () => {
     model.q0 = 0;

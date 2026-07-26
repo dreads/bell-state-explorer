@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/dreads/bell-state-explorer/main/schema/bell-state-export.schema.json",
+  "title": "Bell state explorer export",
+  "description": "Snapshot of the Bell State Density Matrix Explorer's current settings and derived measurements, for external validation against the physics formulas documented in this repository's README and CLAUDE.md.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "exportedAt", "settings", "bellState", "measurements"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI of this schema, so validators can dereference it without out-of-band configuration."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of this export format, independent of the app's own version."
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp the export was generated, RFC 3339 / ISO 8601."
+    },
+    "settings": {
+      "$ref": "#/$defs/settings"
+    },
+    "bellState": {
+      "$ref": "#/$defs/bellState"
+    },
+    "measurements": {
+      "$ref": "#/$defs/measurements"
+    }
+  },
+  "$defs": {
+    "settings": {
+      "type": "object",
+      "required": ["q0", "q1", "thetaRadians", "dephasing", "rotation0Radians", "rotation1Radians"],
+      "additionalProperties": false,
+      "properties": {
+        "q0": {
+          "type": "integer",
+          "enum": [0, 1],
+          "description": "Input bit for q0 (H+CNOT control). Sets the Bell state's relative phase."
+        },
+        "q1": {
+          "type": "integer",
+          "enum": [0, 1],
+          "description": "Input bit for q1 (H+CNOT target). Sets the Bell state's family (Phi/Psi)."
+        },
+        "thetaRadians": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1.5707963267948966,
+          "description": "Amplitude balance in radians, 0 to PI/2. PI/4 is maximal entanglement."
+        },
+        "dephasing": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Dephasing probability, 0 (none) to 1 (fully dephased)."
+        },
+        "rotation0Radians": {
+          "type": "number",
+          "minimum": -6.283185307179586,
+          "maximum": 6.283185307179586,
+          "description": "Local R_y rotation angle applied to q0 after Bell-state preparation, in radians."
+        },
+        "rotation1Radians": {
+          "type": "number",
+          "minimum": -6.283185307179586,
+          "maximum": 6.283185307179586,
+          "description": "Local R_y rotation angle applied to q1 after Bell-state preparation, in radians."
+        }
+      }
+    },
+    "bellState": {
+      "type": "object",
+      "required": ["label", "equation", "psi", "negative"],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Unicode ket label for the prepared Bell state, e.g. \"|Φ⁺⟩\"."
+        },
+        "equation": {
+          "type": "string",
+          "description": "Canonical Dirac equation for the Bell state, independent of theta/dephasing."
+        },
+        "psi": {
+          "type": "boolean",
+          "description": "true for the Psi family {01,10}, false for the Phi family {00,11}."
+        },
+        "negative": {
+          "type": "boolean",
+          "description": "true if the relative phase between the two branches is minus."
+        }
+      }
+    },
+    "probability4x4Row": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": -1, "maximum": 1 },
+        { "type": "number", "minimum": -1, "maximum": 1 },
+        { "type": "number", "minimum": -1, "maximum": 1 },
+        { "type": "number", "minimum": -1, "maximum": 1 }
+      ],
+      "items": false
+    },
+    "blochVector": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": -1, "maximum": 1 },
+        { "type": "number", "minimum": -1, "maximum": 1 },
+        { "type": "number", "minimum": -1, "maximum": 1 }
+      ],
+      "items": false,
+      "description": "[rx, ry, rz]. ry is always 0 for this app's real-valued states."
+    },
+    "outcomeProbability": {
+      "type": "object",
+      "required": ["label", "probability"],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "enum": ["00", "01", "10", "11"]
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "required": [
+        "densityMatrix",
+        "concurrence",
+        "purity",
+        "outcomeProbabilities",
+        "blochVectorQ0",
+        "blochVectorQ1"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "densityMatrix": {
+          "type": "array",
+          "prefixItems": [
+            { "$ref": "#/$defs/probability4x4Row" },
+            { "$ref": "#/$defs/probability4x4Row" },
+            { "$ref": "#/$defs/probability4x4Row" },
+            { "$ref": "#/$defs/probability4x4Row" }
+          ],
+          "items": false,
+          "description": "4x4 real symmetric density matrix, rows/columns ordered 00, 01, 10, 11. Includes any local rotation applied after Bell-state preparation."
+        },
+        "concurrence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Entanglement measure of the pre-rotation Bell state; local rotations preserve it."
+        },
+        "purity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Tr(rho^2) of the post-rotation state. 1 for pure; 0.5 is this family's fully-dephased floor."
+        },
+        "outcomeProbabilities": {
+          "type": "array",
+          "prefixItems": [
+            { "$ref": "#/$defs/outcomeProbability" },
+            { "$ref": "#/$defs/outcomeProbability" },
+            { "$ref": "#/$defs/outcomeProbability" },
+            { "$ref": "#/$defs/outcomeProbability" }
+          ],
+          "items": false,
+          "description": "Diagonal of the density matrix, in basis order 00, 01, 10, 11."
+        },
+        "blochVectorQ0": { "$ref": "#/$defs/blochVector" },
+        "blochVectorQ1": { "$ref": "#/$defs/blochVector" }
+      }
+    }
+  }
+}
