@@ -19,20 +19,28 @@ src/matrix-grid.js                       SVG renderer + sr-only accessible table
 src/bloch-sphere.js                      Bloch sphere SVG renderer + sr-only description
 src/circuit-diagram.js                   circuit diagram SVG renderer + sr-only description
 src/export.js                            builds the export payload — no DOM dependency
+src/circuit-export.js                    renders export-templates/* into a runnable circuit file — no DOM dependency
 src/i18n.js                              translate()/fallback lookup — no DOM dependency
 src/locale-loader.js                     locale discovery/fetch, fetch injectable — no DOM dependency
 src/app.js                               control wiring
 src/styles.css                           light/dark themes via CSS variables
 locales/en.js                            source-of-truth English bundle (static import)
+locales/en.json, en-US.json, en-UK.json  JSON mirror + regional English bundles (fetched, not statically imported)
+locales/es.json                          contributed Spanish bundle
 locales/manifest.json                    picker option list only — not used for detection
 locales/qaa.json, qab.json, qac.json     mock/test-only locales, commented out by default
 schema/bell-state-export.schema.json     JSON Schema (draft 2020-12) for the export payload
 schema/locale-bundle.schema.json         JSON Schema (draft 2020-12) for PR-contributed locale bundles
+export-templates/qiskit.py               checked-in static Qiskit program with @@TOKEN@@ placeholders
+export-templates/openqasm3.qasm          checked-in static OpenQASM 3 program with @@TOKEN@@ placeholders
+doc/quantum-export-research.md           viability research behind the circuit-export feature
 scripts/check-i18n-coverage.js           npm run lint:i18n — hardcoded-string scanner, wired into GHA
 test/state.test.js                       Node-runnable physics tests (incl. property-based invariants)
 test/matrix-grid.test.js                 tests for matrix-grid.js's pure math helpers
 test/bloch-sphere.test.js                tests for bloch-sphere.js's pure vector-math helpers
 test/export.test.js                      tests for export.js's payload shape and values
+test/circuit-export.test.js              tests for circuit-export.js's placeholders/rendering/loader
+test/circuit-export-syntax.test.js       build-time validation that rendered templates are well-formed
 test/i18n.test.js                        tests for i18n.js's lookup/fallback/interpolation
 test/locale-loader.test.js               tests for locale-loader.js (candidate expansion, fetch orchestration)
 test/locale-bundles.test.js              shape-validates every locales/*.json bundle
@@ -317,6 +325,70 @@ grid and circuit diagram SVGs, and `Intl.NumberFormat` at the display
 boundary. A "simple English" reading-level variant was considered and
 explicitly deferred, not built. Do not assume any of that exists — check
 before building on top of it.
+
+## Added: Circuit export (Qiskit / OpenQASM 3)
+
+`src/circuit-export.js` (pure, no DOM) — renders the app's current state into
+a runnable circuit program for an external SDK/vendor, from a checked-in
+static template in `export-templates/` plus `@@TOKEN@@` substitution.
+**No runtime code generation**: the templates are real, well-formed programs
+checked into the repo; the JS only fills in the values that vary per app
+state. Full reasoning (why only the ideal unitary circuit is exported, what a
+fair sim/hardware comparison requires, the Qiskit/OpenQASM bit-order gotcha)
+is in `doc/quantum-export-research.md` — read that before changing any of
+this, not just this summary.
+
+- `EXPORT_TARGETS` is a flat registry: `{ id, label, templatePath, filename,
+  mimeType }`. Adding a vendor/format is one more template file plus one
+  more entry here — no changes to `buildPlaceholders`/`renderTemplate`/
+  `loadCircuitExport`. Currently two targets: `qiskit` (Python,
+  `export-templates/qiskit.py`) and `openqasm3` (vendor-neutral,
+  `export-templates/openqasm3.qasm` — accepted by multiple providers'
+  toolchains, which is why it covers "other IDEs/hardware" more cheaply than
+  adding vendor SDKs one at a time; see the research doc).
+- **Only the ideal, unitary circuit is exported** — state prep (X) + H +
+  CNOT + `Rᵧ(α0)`⊗`Rᵧ(α1)`. The app's `dephasing` slider is applied in
+  `state.js` as a direct multiplication of off-diagonal density-matrix
+  entries — a quantum channel, not a gate — so there is no unitary that
+  reproduces it, and it is deliberately left out rather than approximated.
+  Both templates say this explicitly in their own header comment/docstring,
+  independent of any doc that references them.
+- `buildPlaceholders(model, now)` is pure — computes every `@@TOKEN@@` ->
+  string value pair (input bits, rotation angles in both radians and
+  degrees, Bell-state label/equation, conditional X-gate lines for
+  OpenQASM 3) from the model, independent of which template consumes them.
+- `renderTemplate(template, placeholders)` is pure — global substitution,
+  throws if the template references a token with no placeholder value
+  (typo guard, not a silent pass-through).
+- `loadCircuitExport(targetId, model, { fetchImpl, now })` fetches the
+  target's template (fetch injectable, same convention as
+  `locale-loader.js`) and returns the rendered `{ content, filename,
+  mimeType, label }`. **Unlike locale-loader.js's silent degrade-to-English
+  on a failed fetch**, this throws on failure — the user explicitly asked
+  for a file, so `app.js`'s `exportCircuit()` catches it and shows
+  `ui.exportCircuitError` rather than doing nothing.
+- `app.js`: `#circuit-export-target` `<select>` (options populated from
+  `EXPORT_TARGETS` — vendor/format names are proper nouns, not translated,
+  same rationale as the language picker's own-language `<option>`) and
+  `#export-circuit` button, in a `.export-circuit-fieldset` at the bottom of
+  `<main>`, below the matrix/Bloch/sidebar `.layout` and above the footer.
+- Bit-order caveat baked into both templates' comments: Qiskit/most OpenQASM
+  3 runtimes report measurement counts little-endian (rightmost character is
+  qubit 0), while this app's basis labels read q0 then q1 left to right —
+  get this backwards and outcomes silently swap for any non-symmetric θ.
+- **Build-time validation** (`test/circuit-export-syntax.test.js`, part of
+  `npm test`): renders both templates across all four Bell states plus a
+  rotated case and checks the *rendered* output is well-formed, not just
+  that substitution ran. `qiskit.py` is checked with a real parser — shells
+  out to the system's `python3 -c "import ast; ast.parse(...)"` (stdin, no
+  temp files); skips gracefully if `python3` isn't found locally, but
+  GitHub Actions' `ubuntu-latest` runner ships `python3`, so CI always runs
+  it for real. `openqasm3.qasm` has no zero-dependency real parser
+  available, so it gets a structural heuristic (starts with `OPENQASM 3;`,
+  balanced braces, every statement line ends in `;`/`{`/`}`) in the same
+  "deliberately conservative, not a full parser" spirit as
+  `scripts/check-i18n-coverage.js` — documented as a heuristic, not oversold
+  as equivalent to the Python check.
 
 ## Planned extension directions
 
