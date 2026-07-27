@@ -3,7 +3,7 @@
 // (rather than fetched JSON like PR-contributed locales) so the default
 // language never costs a network round-trip and works offline / from
 // file://. See CLAUDE.md's "Added: i18n foundation" section.
-export const STRINGS_VERSION = '2';
+export const STRINGS_VERSION = '3';
 
 export default {
   meta: {
@@ -48,6 +48,12 @@ export default {
       rotateQ1Label: 'Rotate q1 β',
       resetButton: 'Reset',
       exportButton: 'Export current state',
+      exportCircuitLegend: 'Export circuit',
+      exportTargetLabel: 'Format',
+      exportCircuitButton: 'Download circuit code',
+      exportCircuitNote:
+        'Downloads the ideal state-preparation circuit (H, CNOT, and any local rotation) as a ready-to-run program. Dephasing has no exact gate equivalent, so it is not included — see the comments in the downloaded file for why.',
+      exportCircuitError: 'Could not load the circuit template. Check your connection and try again.',
       keyLargeMagnitude: 'large magnitude',
       keySmallMagnitude: 'small magnitude',
       keyZero: 'zero',

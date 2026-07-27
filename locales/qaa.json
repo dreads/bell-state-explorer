@@ -4,7 +4,7 @@
     "endonym": "Pséüδô Löñg",
     "englishName": "Mock: long/accented (LTR)",
     "direction": "ltr",
-    "targetsVersion": "2"
+    "targetsVersion": "3"
   },
   "strings": {
     "interpret": {
@@ -30,6 +30,11 @@
       "rotateQ1Label": "Rötâté q1 β",
       "resetButton": "Rését",
       "exportButton": "Éxpört cürrént stâté",
+      "exportCircuitLegend": "Éxpört cîrcüït",
+      "exportTargetLabel": "Förmât",
+      "exportCircuitButton": "Döwnlöâd cîrcüït cödé",
+      "exportCircuitNote": "Döwnlöâds thé ïdéâl stâté-préparâtîön cîrcüït (H, CNOT, ánd âný löcâl rötâtîön) âs â réâdý-tö-rün prögrâm. Déphâsîng hâs nö éxâct gâté équïvâlént, sö ît is nöt ïncludéd — sée thé cömménts ïn thé döwnlöâdéd fîlé för whý.",
+      "exportCircuitError": "Cöüld nöt löâd thé cîrcüït témplâté. Chéck ýöür cönnéctîön ánd trý âgâïn.",
       "keyLargeMagnitude": "lârgé mâgñïtûdé",
       "keySmallMagnitude": "smâll mâgñïtûdé",
       "keyZero": "zérö",

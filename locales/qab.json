@@ -4,7 +4,7 @@
     "endonym": "Mock RTL",
     "englishName": "Mock: right-to-left",
     "direction": "rtl",
-    "targetsVersion": "2"
+    "targetsVersion": "3"
   },
   "strings": {
     "interpret": {
@@ -30,6 +30,11 @@
       "rotateQ1Label": "Roqa q1 β",
       "resetButton": "Zora oru",
       "exportButton": "Tresqui elgorai senvara",
+      "exportCircuitLegend": "Tresqui bantu",
+      "exportTargetLabel": "Roqa",
+      "exportCircuitButton": "Senda tresqui elgorai",
+      "exportCircuitNote": "Senda bantu roqavel elgorai (H, CNOT, du roqa partielu maldeen) tresqui prögrâm zora-rün. Vintal du roqa elgorai gâté, du senda elgorai kuresh — achkedo senda fen bantu tresqui.",
+      "exportCircuitError": "Zora du roqa tresqui bantu. Achkedo kuresh du roqa, tresqui achkedo.",
       "keyLargeMagnitude": "bantu elgorai",
       "keySmallMagnitude": "bantu maldeen",
       "keyZero": "zora",

@@ -245,6 +245,51 @@ button[aria-pressed="true"] {
   border-color: var(--ink);
 }
 
+.export-circuit-fieldset {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.export-circuit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.export-circuit-row label {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.export-circuit-row select {
+  font-family: var(--font-data);
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 0.4rem 0.5rem;
+}
+
+.export-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  max-width: 46rem;
+}
+
+.export-status {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.export-status:empty {
+  display: none;
+}
+
 input[type="range"] {
   width: 100%;
   accent-color: var(--ink);

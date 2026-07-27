@@ -6,6 +6,7 @@
 <title>Bell state density matrix explorer</title>
 <meta name="description" content="An interactive greyscale density matrix for the four Bell states, with dephasing and amplitude balance controls.">
 <link rel="stylesheet" href="src/styles.css">
+<link rel="shortcut icon" href="#">
 </head>
 <body>
 <div class="shell">
@@ -143,6 +144,26 @@
   <p class="reading" id="reading" role="status"></p>
 </aside>
 </div>
+
+<fieldset class="export-circuit-fieldset">
+  <legend data-i18n="ui.exportCircuitLegend">Export circuit</legend>
+  <div class="export-circuit-row">
+    <label for="circuit-export-target" data-i18n="ui.exportTargetLabel">Format</label>
+    <!-- Options are populated in app.js from circuit-export.js's EXPORT_TARGETS
+         registry. Their labels are vendor/format names ("Qiskit (Python)",
+         "OpenQASM 3") — proper nouns/notation, not translated content, same
+         convention as the language picker's own-language <option> above. -->
+    <select id="circuit-export-target"></select>
+    <button type="button" id="export-circuit" class="reset-btn" data-i18n="ui.exportCircuitButton">Download circuit code</button>
+  </div>
+  <p class="export-note" data-i18n="ui.exportCircuitNote">
+    Downloads the ideal state-preparation circuit (H, CNOT, and any local
+    rotation) as a ready-to-run program. Dephasing has no exact gate
+    equivalent, so it is not included — see the comments in the downloaded
+    file for why.
+  </p>
+  <p class="export-status" id="export-circuit-status" role="status"></p>
+</fieldset>
 </main>
 
 <footer></footer>

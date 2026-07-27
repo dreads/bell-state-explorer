@@ -17,6 +17,7 @@ import { createMatrixGrid } from './matrix-grid.js';
 import { createBlochSpheres } from './bloch-sphere.js';
 import { createCircuitDiagram } from './circuit-diagram.js';
 import { buildExportPayload } from './export.js';
+import { EXPORT_TARGETS, loadCircuitExport } from './circuit-export.js';
 import { translate } from './i18n.js';
 import { loadManifest, loadLocaleBundle, detectLocale } from './locale-loader.js';
 import en from '../locales/en.js';
@@ -84,6 +85,9 @@ function query() {
     'local-rotation-1-value',
     'reset',
     'export-state',
+    'circuit-export-target',
+    'export-circuit',
+    'export-circuit-status',
     'locale-picker',
   ].forEach((id) => {
     dom[id] = document.getElementById(id);
@@ -272,8 +276,7 @@ function render() {
   );
 }
 
-function downloadJson(filename, payload) {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+function downloadBlob(filename, blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -284,12 +287,47 @@ function downloadJson(filename, payload) {
   URL.revokeObjectURL(url);
 }
 
+function downloadJson(filename, payload) {
+  downloadBlob(filename, new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+}
+
+function downloadText(filename, text, mimeType) {
+  downloadBlob(filename, new Blob([text], { type: mimeType }));
+}
+
 function exportState() {
   const payload = buildExportPayload(model);
   const { psi, negative } = bellFromInput(model.q0, model.q1);
   const bellKey = `${psi ? 'psi' : 'phi'}-${negative ? 'minus' : 'plus'}`;
   const timestamp = payload.exportedAt.replace(/[:.]/g, '-');
   downloadJson(`bell-state-${bellKey}-${timestamp}.json`, payload);
+}
+
+/** Vendor/format names ("Qiskit (Python)", "OpenQASM 3") are proper nouns,
+ * not translated content — same rationale as index.html's own-language
+ * <option> in the locale picker. Runs once at init(); the registry itself
+ * never changes at runtime. */
+function populateCircuitExportTargets() {
+  const select = dom['circuit-export-target'];
+  EXPORT_TARGETS.forEach((target) => {
+    const option = document.createElement('option');
+    option.value = target.id;
+    option.textContent = target.label;
+    select.appendChild(option);
+  });
+}
+
+async function exportCircuit() {
+  dom['export-circuit-status'].textContent = '';
+  try {
+    const { content, filename, mimeType } = await loadCircuitExport(
+      dom['circuit-export-target'].value,
+      model,
+    );
+    downloadText(filename, content, mimeType);
+  } catch {
+    dom['export-circuit-status'].textContent = t('ui.exportCircuitError');
+  }
 }
 
 function init() {
@@ -300,6 +338,7 @@ function init() {
   drawCircuit = createCircuitDiagram(dom['circuit-diagram']);
   bellRows = dom['bell-state-list'].querySelectorAll('.bell-row');
   populateBellRows();
+  populateCircuitExportTargets();
 
   dom.q0.addEventListener('click', () => toggleBit('q0'));
   dom.phase.addEventListener('click', () => toggleBit('q0'));
@@ -327,6 +366,7 @@ function init() {
   });
 
   dom['export-state'].addEventListener('click', exportState);
+  dom['export-circuit'].addEventListener('click', exportCircuit);
 
   dom['locale-picker'].addEventListener('change', (e) => onLocaleChange(e.target.value));
 
