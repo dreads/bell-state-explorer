@@ -397,6 +397,41 @@ braces, terminated statements) for `openqasm2.qasm`, since no
 zero-dependency OpenQASM parser exists. Any template edit should keep
 passing both.
 
+## CI/CD: Qiskit Runtime integration
+
+`qiskit-runtime/` is a separate Python subproject — not part of the app's
+zero-dependency static site — that runs the app's canonical Φ⁺ Bell state
+through [`qiskit-ibm-runtime`](https://github.com/Qiskit/qiskit-ibm-runtime)
+as a real cross-check of `src/state.js`'s math against an actual (simulated)
+execution, and as a working example of wiring CI to IBM Quantum Cloud's API.
+See `qiskit-runtime/README.md` for local usage.
+
+One script, two modes: `run_circuit.py` runs against a local `AerSimulator`
+when no `QISKIT_IBM_TOKEN` is set (no auth, no network), or against a real
+IBM Cloud simulator backend — chosen dynamically via
+`least_busy(simulator=True, operational=True)`, never a hardcoded backend
+name — when it is. Both GitHub Actions workflows below call the identical
+`make -C qiskit-runtime integration-test`; only the environment differs:
+
+- **`.github/workflows/qiskit-runtime-pr-check.yml`** runs on every pull
+  request, references no secrets, and only ever exercises the local
+  simulator — safe on PRs from forks. Its `local-sim-check` job is meant to
+  be added as a required branch-protection status check for `main` (Settings
+  → Branches), which is a one-time manual repo setting, not something a
+  workflow file can turn on by itself.
+- **`.github/workflows/qiskit-runtime-cloud-integration.yml`** runs daily
+  plus on manual dispatch, gated to this repo's owner, and always targets a
+  cloud *simulator* — never a real QPU, to keep cost and queue time
+  predictable. It needs two repo secrets: `QISKIT_IBM_TOKEN` (your IBM Cloud
+  API key) and `QISKIT_IBM_INSTANCE` (your Qiskit Runtime instance's CRN,
+  found on the IBM Quantum Platform dashboard's Instances tab).
+
+`qiskit-runtime/Dockerfile` exists purely for local rehearsal — pinning the
+same Python/Qiskit versions CI uses so you can iterate without touching your
+host Python. Neither workflow builds or uses that image; both install
+dependencies directly on `ubuntu-latest`, the same way
+`Qiskit/qiskit-ibm-runtime`'s own CI does.
+
 ## Internationalization
 
 Only English ships as a maintained locale today. Every other language is
@@ -497,6 +532,10 @@ test/circuit-export-syntax.test.js      build-time validation that rendered temp
 test/i18n.test.js                       i18n.js lookup/fallback/interpolation tests
 test/locale-loader.test.js              locale-loader.js candidate-expansion/fetch-orchestration tests
 test/locale-bundles.test.js             shape-validates every locales/*.json bundle
+qiskit-runtime/                         separate Python subproject — see "CI/CD: Qiskit Runtime integration" above
+.github/workflows/deploy.yml            npm test + lint:i18n, then deploy to GitHub Pages
+.github/workflows/qiskit-runtime-pr-check.yml           local-simulator-only PR check, no secrets
+.github/workflows/qiskit-runtime-cloud-integration.yml  daily real-IBM-Cloud integration test
 ```
 
 `src/state.js`, `src/export.js`, `src/circuit-export.js`, `src/i18n.js`, and

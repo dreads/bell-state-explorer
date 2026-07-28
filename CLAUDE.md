@@ -44,6 +44,10 @@ test/circuit-export-syntax.test.js       build-time validation that rendered tem
 test/i18n.test.js                        tests for i18n.js's lookup/fallback/interpolation
 test/locale-loader.test.js               tests for locale-loader.js (candidate expansion, fetch orchestration)
 test/locale-bundles.test.js              shape-validates every locales/*.json bundle
+qiskit-runtime/                          separate Python subproject, see its own README + CI/CD section below
+.github/workflows/deploy.yml             npm test + lint:i18n, then deploy to GitHub Pages
+.github/workflows/qiskit-runtime-pr-check.yml           local-simulator-only PR check, no secrets
+.github/workflows/qiskit-runtime-cloud-integration.yml  daily real-IBM-Cloud integration test
 ```
 
 ## Architecture
@@ -394,6 +398,75 @@ this, not just this summary.
   "deliberately conservative, not a full parser" spirit as
   `scripts/check-i18n-coverage.js` — documented as a heuristic, not oversold
   as equivalent to the Python check.
+
+## Added: CI/CD (Qiskit Runtime integration)
+
+Independent of the app itself: `qiskit-runtime/` is a separate Python
+subproject (own `requirements.txt`, not part of the zero-dependency static
+site) that runs the canonical Phi+ Bell-state circuit through
+[`qiskit-ibm-runtime`](https://github.com/Qiskit/qiskit-ibm-runtime), as a
+real cross-check of `src/state.js`'s Phi+ math against an actual (simulated)
+execution, and as devops practice integrating with IBM Quantum Cloud's API
+from CI. Its own `qiskit-runtime/README.md` covers local usage; this section
+covers the CI/CD design and why it's shaped this way.
+
+- **One script, two modes.** `qiskit-runtime/run_circuit.py`'s
+  `select_backend()` picks the backend from whether `QISKIT_IBM_TOKEN` is
+  set in the environment: unset -> local `AerSimulator` (no auth, no
+  network — this is Qiskit's own documented local-testing pattern, passing
+  a local simulator directly as `SamplerV2`'s `mode`); set -> a real IBM
+  Cloud `QiskitRuntimeService` session. `qiskit-runtime/test_integration.py`
+  calls the same function and asserts `p('00') + p('11')` clears
+  `CORRELATED_THRESHOLD` (0.9) — both `.github/workflows/qiskit-runtime-*.yml`
+  below call the identical `make -C qiskit-runtime integration-test`
+  target; only the environment (secrets present or not) differs between
+  them, so there is exactly one code path to maintain, not two.
+- **Dynamic backend discovery, optimized for shortest queue.** The cloud
+  path never hardcodes a backend name — it calls
+  `QiskitRuntimeService.least_busy(simulator=True, operational=True)`,
+  which IBM's API returns as whichever operational simulator backend
+  currently has the fewest pending jobs. `simulator=True` is load-bearing:
+  this project intentionally never submits to a real QPU from CI (cost and
+  queue-time variability), only ever a cloud-hosted simulator.
+- **`instance` is a CRN** (Cloud Resource Name), found on the IBM Quantum
+  Platform dashboard's Instances tab. Current channel is
+  `ibm_quantum_platform` (replaced the older `ibm_quantum`/`ibm_cloud`
+  channel split — re-verify against IBM's docs before assuming this is
+  still current, same caution `doc/quantum-export-research.md` already
+  calls out for this fast-moving API surface).
+- **Two independent GHA workflows, not one, deliberately split by secret
+  exposure:**
+  - `.github/workflows/qiskit-runtime-pr-check.yml` — trigger:
+    `pull_request`. References no secrets at all, so it's safe on PRs from
+    forks. Runs the local-`AerSimulator` path only. Job name
+    `local-sim-check` is meant to be added as a **required status check**
+    (Settings -> Branches -> branch protection rule for `main` -> "Require
+    status checks to pass", after it's run at least once — this is a
+    one-time manual repo-settings step, not something the workflow file
+    itself can configure).
+  - `.github/workflows/qiskit-runtime-cloud-integration.yml` — trigger:
+    daily `schedule` (06:00 UTC) + `workflow_dispatch`, gated with
+    `if: github.repository_owner == 'dreads'`. Never triggers on
+    push/PR — this mirrors upstream `Qiskit/qiskit-ibm-runtime`'s own
+    `integration-tests.yml`/`smoke-tests.yml` (scheduled + manual only,
+    owner-gated), which itself runs on bare `ubuntu-latest` with no Docker
+    involved — the pattern this project's own workflow follows. Requires
+    two repo secrets: `QISKIT_IBM_TOKEN` (44-char API key) and
+    `QISKIT_IBM_INSTANCE` (CRN) — set these in Settings -> Secrets before
+    this workflow can pass; until then it will fail with an auth error,
+    which is expected, not a bug.
+- **Docker is local-dev-only.** `qiskit-runtime/Dockerfile` pins the exact
+  Python/Qiskit versions for local rehearsal (`docker build` /
+  `docker run`, see its README) so you can iterate without touching host
+  Python. Neither GHA workflow uses this image or builds/pushes it — the
+  runners already are isolated ephemeral containers, so adding an
+  image-build step to CI itself would be pure overhead with no reproducibility
+  benefit upstream's own CI doesn't already get for free.
+- **Cost/quota discipline**: daily cadence + simulator-only is the ceiling
+  for automatic cloud usage this project should incur without a deliberate
+  decision to widen it (real QPU, tighter cadence) — don't change either
+  without accounting for the cost/queue-time tradeoff this section exists
+  to document.
 
 ## Planned extension directions
 
