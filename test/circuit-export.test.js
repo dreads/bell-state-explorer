@@ -111,9 +111,9 @@ test('loadCircuitExport renders the fetched template and derives filename/label'
 });
 
 test('loadCircuitExport produces a distinct filename per Bell state', async () => {
-  const fetchImpl = fakeFetch({ 'export-templates/openqasm3.qasm': 'x' });
-  const phiPlus = await loadCircuitExport('openqasm3', { ...BASE_MODEL, q0: 0, q1: 0 }, { fetchImpl, now: NOW });
-  const psiMinus = await loadCircuitExport('openqasm3', { ...BASE_MODEL, q0: 1, q1: 1 }, { fetchImpl, now: NOW });
+  const fetchImpl = fakeFetch({ 'export-templates/openqasm2.qasm': 'x' });
+  const phiPlus = await loadCircuitExport('openqasm2', { ...BASE_MODEL, q0: 0, q1: 0 }, { fetchImpl, now: NOW });
+  const psiMinus = await loadCircuitExport('openqasm2', { ...BASE_MODEL, q0: 1, q1: 1 }, { fetchImpl, now: NOW });
   assert.equal(phiPlus.filename, 'bell-state-phi-plus.qasm');
   assert.equal(psiMinus.filename, 'bell-state-psi-minus.qasm');
 });
