@@ -69,14 +69,14 @@ test('rendered qiskit.py is valid Python for every representative app state', (t
   });
 });
 
-// --- OpenQASM 3 ----------------------------------------------------------
-// No zero-dependency OpenQASM 3 parser is available, so this is a
-// structural heuristic in the same spirit as scripts/check-i18n-coverage.js:
+// --- OpenQASM 2.0 ----------------------------------------------------------
+// No zero-dependency OpenQASM parser is available, so this is a structural
+// heuristic in the same spirit as scripts/check-i18n-coverage.js:
 // deliberately conservative, catches the mistakes a template edit is
 // actually likely to introduce, not a substitute for a real grammar check.
 
-function assertPlausibleOpenQasm3(source, label) {
-  assert.match(source, /^OPENQASM 3;/, `${label}: must start with "OPENQASM 3;"`);
+function assertPlausibleOpenQasm2(source, label) {
+  assert.match(source, /^OPENQASM 2\.0;/, `${label}: must start with "OPENQASM 2.0;"`);
   assert.doesNotMatch(source, /@@[A-Z0-9_]+@@/, `${label}: left an unsubstituted @@TOKEN@@`);
 
   const opens = (source.match(/{/g) || []).length;
@@ -92,10 +92,10 @@ function assertPlausibleOpenQasm3(source, label) {
     });
 }
 
-test('rendered openqasm3.qasm is structurally plausible for every representative app state', () => {
-  const target = EXPORT_TARGETS.find((tgt) => tgt.id === 'openqasm3');
+test('rendered openqasm2.qasm is structurally plausible for every representative app state', () => {
+  const target = EXPORT_TARGETS.find((tgt) => tgt.id === 'openqasm2');
   REPRESENTATIVE_MODELS.forEach((model) => {
     const rendered = renderedFor(target, model);
-    assertPlausibleOpenQasm3(rendered, `openqasm3.qasm (q0=${model.q0}, q1=${model.q1}, rot=${model.rotation0}/${model.rotation1})`);
+    assertPlausibleOpenQasm2(rendered, `openqasm2.qasm (q0=${model.q0}, q1=${model.q1}, rot=${model.rotation0}/${model.rotation1})`);
   });
 });

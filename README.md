@@ -358,15 +358,19 @@ neither one currently enforces the other automatically.
 
 Below the main layout, the **Export circuit** panel downloads the current
 state as an actual program you can run — not just a JSON snapshot of the
-numbers. Pick a format (currently **Qiskit** or **OpenQASM 3**) and
+numbers. Pick a format (currently **Qiskit** or **OpenQASM 2.0**) and
 **Download circuit code** produces a file parameterized for the current Bell
 state and local rotation angles.
 
 This is checked-in, static code, not something generated at runtime: each
 format is one well-formed template in `export-templates/` (`qiskit.py`,
-`openqasm3.qasm`) with `@@TOKEN@@` placeholders that `src/circuit-export.js`
+`openqasm2.qasm`) with `@@TOKEN@@` placeholders that `src/circuit-export.js`
 fills in. Adding a third format later is one more template file plus one
-registry entry, not a change to the rendering logic.
+registry entry, not a change to the rendering logic. The vendor-neutral
+target is OpenQASM **2.0**, not 3 — OpenQASM 3 import support is still
+inconsistent across vendor tooling (IBM Quantum Composer in particular threw
+parse errors on it in practice), while 2.0 is the long-established format
+nearly every gate-model provider accepts directly.
 
 **Only the ideal, unitary circuit is exported** — state prep, Hadamard,
 CNOT, and the two `Rᵧ` rotations. The **dephasing** slider is intentionally
@@ -389,8 +393,8 @@ values, template rendering, and the fetch-based loader.
 `test/circuit-export-syntax.test.js` build-validates the *rendered* output
 of both templates — a real Python syntax check (`ast.parse` via the
 system's `python3`) for `qiskit.py`, and a structural heuristic (balanced
-braces, terminated statements) for `openqasm3.qasm`, since no
-zero-dependency OpenQASM 3 parser exists. Any template edit should keep
+braces, terminated statements) for `openqasm2.qasm`, since no
+zero-dependency OpenQASM parser exists. Any template edit should keep
 passing both.
 
 ## Internationalization
@@ -481,7 +485,7 @@ locales/qaa.json, qab.json, qac.json    mock/test-only locales, commented out by
 schema/bell-state-export.schema.json    JSON Schema (draft 2020-12) for exported state
 schema/locale-bundle.schema.json        JSON Schema (draft 2020-12) for contributed locale bundles
 export-templates/qiskit.py              checked-in static Qiskit program with @@TOKEN@@ placeholders
-export-templates/openqasm3.qasm         checked-in static OpenQASM 3 program with @@TOKEN@@ placeholders
+export-templates/openqasm2.qasm         checked-in static OpenQASM 2.0 program with @@TOKEN@@ placeholders
 doc/quantum-export-research.md          viability research behind the circuit-export feature
 scripts/check-i18n-coverage.js          npm run lint:i18n — hardcoded-string scanner, runs in CI
 test/state.test.js                      physics tests
