@@ -406,11 +406,16 @@ as a real cross-check of `src/state.js`'s math against an actual (simulated)
 execution, and as a working example of wiring CI to IBM Quantum Cloud's API.
 See `qiskit-runtime/README.md` for local usage.
 
-One script, two modes: `run_circuit.py` runs against a local `AerSimulator`
-when no `QISKIT_IBM_TOKEN` is set (no auth, no network), or against a real
-IBM Cloud simulator backend — chosen dynamically via
-`least_busy(simulator=True, operational=True)`, never a hardcoded backend
-name — when it is. Both GitHub Actions workflows below call the identical
+One script, two modes, both execute locally: `run_circuit.py` runs against a
+plain local `AerSimulator` when no `QISKIT_IBM_TOKEN` is set (no auth, no
+network). When it is set, it authenticates for real against IBM Cloud
+(`service.jobs(limit=1)`, a cheap round-trip that proves the token/instance
+actually work), reads a real QPU's calibration snapshot via
+`least_busy(operational=True, simulator=False)`, and runs the circuit
+locally against `AerSimulator.from_backend(...)` seeded with that snapshot —
+IBM retired cloud-hosted simulator backends on 2024-05-15, so there's no
+cloud simulator left to submit to; this is IBM's own documented replacement.
+Both GitHub Actions workflows below call the identical
 `make -C qiskit-runtime integration-test`; only the environment differs:
 
 - **`.github/workflows/qiskit-runtime-pr-check.yml`** runs on every pull
@@ -420,11 +425,12 @@ name — when it is. Both GitHub Actions workflows below call the identical
   → Branches), which is a one-time manual repo setting, not something a
   workflow file can turn on by itself.
 - **`.github/workflows/qiskit-runtime-cloud-integration.yml`** runs daily
-  plus on manual dispatch, gated to this repo's owner, and always targets a
-  cloud *simulator* — never a real QPU, to keep cost and queue time
-  predictable. It needs two repo secrets: `QISKIT_IBM_TOKEN` (your IBM Cloud
-  API key) and `QISKIT_IBM_INSTANCE` (your Qiskit Runtime instance's CRN,
-  found on the IBM Quantum Platform dashboard's Instances tab).
+  plus on manual dispatch, gated to this repo's owner, and never submits a
+  job to a real QPU's queue — reading calibration data is a
+  backend-inspection call, not a job submission — to keep cost and queue
+  time predictable. It needs two repo secrets: `QISKIT_IBM_TOKEN` (your IBM
+  Cloud API key) and `QISKIT_IBM_INSTANCE` (your Qiskit Runtime instance's
+  CRN, found on the IBM Quantum Platform dashboard's Instances tab).
 
 `qiskit-runtime/Dockerfile` exists purely for local rehearsal — pinning the
 same Python/Qiskit versions CI uses so you can iterate without touching your

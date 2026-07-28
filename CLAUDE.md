@@ -410,24 +410,47 @@ execution, and as devops practice integrating with IBM Quantum Cloud's API
 from CI. Its own `qiskit-runtime/README.md` covers local usage; this section
 covers the CI/CD design and why it's shaped this way.
 
-- **One script, two modes.** `qiskit-runtime/run_circuit.py`'s
+- **One script, two modes, both execute locally.** `qiskit-runtime/run_circuit.py`'s
   `select_backend()` picks the backend from whether `QISKIT_IBM_TOKEN` is
-  set in the environment: unset -> local `AerSimulator` (no auth, no
+  set in the environment: unset -> plain local `AerSimulator` (no auth, no
   network — this is Qiskit's own documented local-testing pattern, passing
-  a local simulator directly as `SamplerV2`'s `mode`); set -> a real IBM
-  Cloud `QiskitRuntimeService` session. `qiskit-runtime/test_integration.py`
-  calls the same function and asserts `p('00') + p('11')` clears
-  `CORRELATED_THRESHOLD` (0.9) — both `.github/workflows/qiskit-runtime-*.yml`
-  below call the identical `make -C qiskit-runtime integration-test`
-  target; only the environment (secrets present or not) differs between
-  them, so there is exactly one code path to maintain, not two.
-- **Dynamic backend discovery, optimized for shortest queue.** The cloud
-  path never hardcodes a backend name — it calls
+  a local simulator directly as `SamplerV2`'s `mode`); set -> a local
+  `AerSimulator.from_backend(...)` seeded with a real IBM backend's noise
+  snapshot, reached via a real IBM Cloud `QiskitRuntimeService` session.
+  `qiskit-runtime/test_integration.py` calls the same function and asserts
+  `p('00') + p('11')` clears `CORRELATED_THRESHOLD` (0.9) — both
+  `.github/workflows/qiskit-runtime-*.yml` below call the identical
+  `make -C qiskit-runtime integration-test` target; only the environment
+  (secrets present or not) differs between them, so there is exactly one
+  code path to maintain, not two.
+- **Cloud simulators are gone; this is IBM's documented replacement.** IBM
+  retired cloud-hosted simulator backends on 2024-05-15 (see
+  https://quantum.cloud.ibm.com/docs/en/guides/local-simulators) — the
+  original design here called
   `QiskitRuntimeService.least_busy(simulator=True, operational=True)`,
-  which IBM's API returns as whichever operational simulator backend
-  currently has the fewest pending jobs. `simulator=True` is load-bearing:
-  this project intentionally never submits to a real QPU from CI (cost and
-  queue-time variability), only ever a cloud-hosted simulator.
+  which can never match anything anymore and fails with
+  `QiskitBackendNotFoundError: 'No backend matches the criteria.'` (this bit
+  us directly: the daily workflow started failing once IBM finished the
+  retirement, independent of anything in this repo changing). The fix
+  mirrors IBM's own guidance: `select_backend()` now calls
+  `service.least_busy(operational=True, simulator=False)` — explicit,
+  intentional selection of a real QPU — purely to read its calibration data
+  and hand it to `AerSimulator.from_backend()`; the circuit still runs
+  entirely locally. Reading calibration data is a backend-inspection API
+  call, not a job submission, so this preserves the original "never submits
+  a job to a real QPU from CI" cost/queue-time constraint — via a different
+  mechanism (local execution) than before (filtering QPUs out of selection
+  entirely).
+- **Connectivity is verified independently of backend selection.**
+  `select_backend()` first calls `verify_cloud_connection(service)`, which
+  lists recent jobs (`service.jobs(limit=1)`) — a real round-trip to the
+  IBM Cloud Runtime API that only needs a valid token + instance CRN,
+  regardless of which backends that instance's plan can see. This exists
+  because an instance's CRN may be scoped to QPU access only (no
+  simulator entitlement) — a case this project hit directly — so proving
+  "the token and instance actually authenticate" has to be decoupled from
+  "and this account can also see backend X." The job count is surfaced in
+  the returned backend name string for visibility in workflow logs.
 - **`instance` is a CRN** (Cloud Resource Name), found on the IBM Quantum
   Platform dashboard's Instances tab. Current channel is
   `ibm_quantum_platform` (replaced the older `ibm_quantum`/`ibm_cloud`
