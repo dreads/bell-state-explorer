@@ -303,7 +303,7 @@ function exportState() {
   downloadJson(`bell-state-${bellKey}-${timestamp}.json`, payload);
 }
 
-/** Vendor/format names ("Qiskit (Python)", "OpenQASM 3") are proper nouns,
+/** Vendor/format names ("Qiskit (Python)", "OpenQASM 2.0") are proper nouns,
  * not translated content — same rationale as index.html's own-language
  * <option> in the locale picker. Runs once at init(); the registry itself
  * never changes at runtime. */

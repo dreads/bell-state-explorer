@@ -22,9 +22,9 @@ export const EXPORT_TARGETS = [
     mimeType: 'text/x-python',
   },
   {
-    id: 'openqasm3',
-    label: 'OpenQASM 3',
-    templatePath: 'export-templates/openqasm3.qasm',
+    id: 'openqasm2',
+    label: 'OpenQASM 2.0',
+    templatePath: 'export-templates/openqasm2.qasm',
     filename: (slug) => `bell-state-${slug}.qasm`,
     mimeType: 'text/plain',
   },
@@ -47,7 +47,7 @@ function toDegrees(radians) {
 }
 
 /** Fixed-decimal, never scientific notation, so the value is always a valid
- * numeric literal in both Python and OpenQASM 3. */
+ * numeric literal in both Python and OpenQASM. */
 function formatRadians(radians) {
   return Number(radians).toFixed(10);
 }

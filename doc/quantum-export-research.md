@@ -42,29 +42,50 @@ program's behavior depend on Qiskit's noise-model API staying stable, which
 is a heavier maintenance commitment than the rest of this project takes on
 for a single slider.
 
-## Why "vendor-neutral" is realistic: OpenQASM 3
+## Why "vendor-neutral" is realistic: OpenQASM (2.0, not 3)
 
 Every major gate-model vendor's SDK is ultimately a wrapper that builds a
 circuit and hands it to *some* execution backend. Qiskit is IBM's SDK, but the
-circuit itself — X, H, CNOT, Rᵧ, measure — is universal. **OpenQASM 3** is the
-IETF/Qiskit-originated, now broadly-adopted textual IR for exactly this: a
-gate-model circuit with no vendor-specific execution semantics attached.
-Multiple providers' toolchains (Amazon Braket's SDK, IonQ's API surface,
-Qiskit itself) accept OpenQASM 3 as an import format for gate-based circuits,
-which is *why* it was picked as this feature's second export target instead
-of, say, hand-writing separate Cirq or pyQuil templates: one vendor-neutral
-template covers a much larger set of "other IDEs/hardware" than any single
-additional vendor SDK would, for the same maintenance cost as maintaining one
-more template file. Concretely check each vendor's current import path before
-relying on it (e.g. Braket's OpenQASM 3 support and IonQ's accepted circuit
-formats have each evolved over time), but the *shape* of the claim — "OpenQASM
-3 in, gate-model circuit out, vendor-agnostic" — is stable.
+circuit itself — X, H, CNOT, Rᵧ, measure — is universal. **OpenQASM** is the
+textual IR for exactly this: a gate-model circuit with no vendor-specific
+execution semantics attached. That's *why* it was picked as this feature's
+second export target instead of, say, hand-writing separate Cirq or pyQuil
+templates: one vendor-neutral template covers a much larger set of "other
+IDEs/hardware" than any single additional vendor SDK would, for the same
+maintenance cost as maintaining one more template file.
+
+**Update, first real run**: the original choice here was OpenQASM **3**
+(newer, IETF-track, the direction the ecosystem is heading). In practice,
+pasting the exported `openqasm3.qasm` into **IBM Quantum Composer** produced
+multiple parse errors — OpenQASM 3 import support is evidently still
+inconsistent across vendor tooling in mid-2026, IBM's own included, despite
+IBM having co-originated the spec. The export target was downgraded to
+**OpenQASM 2.0** (`qreg`/`creg` declarations, `include "qelib1.inc";`,
+`measure q[0] -> c[0];` syntax) as a direct result. OpenQASM 2.0 is the much
+older, far more universally implemented format — it's what Qiskit itself
+emitted by default for years — so it trades "the newer spec" for "the one
+that actually parses everywhere today," which is the right trade for a
+template whose entire value proposition is "just works when pasted into
+someone else's tool." If OpenQASM 3 import support matures broadly across
+vendor Composers/SDKs later, that's grounds for *adding* it back as a third
+target, not for reverting this one — don't re-litigate this decision without
+that evidence in hand.
+
+Concretely check each vendor's current import path before relying on it —
+which formats/versions Amazon Braket's SDK, IonQ's API surface, Rigetti, and
+similar accept has each evolved over time and will keep evolving — but the
+lesson from the Composer errors generalizes: prefer whichever OpenQASM
+version is *actually* broadly supported today over whichever is newest, and
+re-verify by testing against the real tool, not by trusting a spec version
+number.
 
 This is also exactly why the registry in `src/circuit-export.js` is a flat
 array of `{ id, label, templatePath, filename }` entries rather than
-anything Qiskit-specific: adding a third target (Cirq, pyQuil, a vendor's
-native JSON circuit format) is one more template file plus one more registry
-entry, not a change to the rendering pipeline.
+anything Qiskit-specific: swapping OpenQASM 3 for 2.0 was a template
+rewrite plus a one-line id/label/path change in the registry, not a change
+to the rendering pipeline — and adding a third target (Cirq, pyQuil, a
+vendor's native JSON circuit format, or OpenQASM 3 again someday) is the
+same shape of change.
 
 ## Comparing simulator numbers to the app: straightforward
 
@@ -139,10 +160,10 @@ not to notice for `θ=45°` (probabilities are symmetric) but wrong for any
 asymmetric `θ`. `export-templates/qiskit.py` reverses the bitstring before
 printing specifically so its printed output is already in the app's
 ordering; the comment there exists so a reader who *doesn't* use that
-helper function still knows to do the reversal themselves. OpenQASM 3's own
-`bit[2] c` result ordering follows the same little-endian convention when
+helper function still knows to do the reversal themselves. OpenQASM 2.0's own
+`creg c[2]` result ordering follows the same little-endian convention when
 read back by most tooling, so the same caveat applies to
-`export-templates/openqasm3.qasm`.
+`export-templates/openqasm2.qasm`.
 
 ## Recommended shape for the eventual IBM Cloud walkthrough doc
 
@@ -158,7 +179,7 @@ forgotten:
 ## Summary
 
 - Export the ideal unitary circuit (X, H, CNOT, Rᵧ⊗Rᵧ) only; dephasing has no gate equivalent and is called out in-file, not silently dropped.
-- Qiskit (Python) + OpenQASM 3 as a second, vendor-neutral target together cover "other IDEs/hardware" better than chasing individual vendor SDKs one at a time; the registry in `src/circuit-export.js` makes adding a third target cheap later.
+- Qiskit (Python) + OpenQASM 2.0 as a second, vendor-neutral target together cover "other IDEs/hardware" better than chasing individual vendor SDKs one at a time; the registry in `src/circuit-export.js` makes adding a third target cheap later. OpenQASM 2.0 over 3 because 3's import support proved inconsistent in practice (IBM Quantum Composer errored on it) — verified against the real tool, not assumed from the spec version.
 - Statevector-simulator comparison against the app is exact and directly useful.
 - Real-hardware comparison is valid **only for outcome probabilities** (the diagonal); the coherences require state tomography, which is out of scope for the shipped template.
 - Real device noise is not a stand-in for the `dephasing` slider — interesting to show side by side, wrong to present as equivalent.

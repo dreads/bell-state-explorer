@@ -32,7 +32,7 @@ locales/qaa.json, qab.json, qac.json     mock/test-only locales, commented out b
 schema/bell-state-export.schema.json     JSON Schema (draft 2020-12) for the export payload
 schema/locale-bundle.schema.json         JSON Schema (draft 2020-12) for PR-contributed locale bundles
 export-templates/qiskit.py               checked-in static Qiskit program with @@TOKEN@@ placeholders
-export-templates/openqasm3.qasm          checked-in static OpenQASM 3 program with @@TOKEN@@ placeholders
+export-templates/openqasm2.qasm          checked-in static OpenQASM 2.0 program with @@TOKEN@@ placeholders
 doc/quantum-export-research.md           viability research behind the circuit-export feature
 scripts/check-i18n-coverage.js           npm run lint:i18n — hardcoded-string scanner, wired into GHA
 test/state.test.js                       Node-runnable physics tests (incl. property-based invariants)
@@ -326,7 +326,7 @@ boundary. A "simple English" reading-level variant was considered and
 explicitly deferred, not built. Do not assume any of that exists — check
 before building on top of it.
 
-## Added: Circuit export (Qiskit / OpenQASM 3)
+## Added: Circuit export (Qiskit / OpenQASM 2.0)
 
 `src/circuit-export.js` (pure, no DOM) — renders the app's current state into
 a runnable circuit program for an external SDK/vendor, from a checked-in
@@ -342,10 +342,15 @@ this, not just this summary.
   mimeType }`. Adding a vendor/format is one more template file plus one
   more entry here — no changes to `buildPlaceholders`/`renderTemplate`/
   `loadCircuitExport`. Currently two targets: `qiskit` (Python,
-  `export-templates/qiskit.py`) and `openqasm3` (vendor-neutral,
-  `export-templates/openqasm3.qasm` — accepted by multiple providers'
-  toolchains, which is why it covers "other IDEs/hardware" more cheaply than
-  adding vendor SDKs one at a time; see the research doc).
+  `export-templates/qiskit.py`) and `openqasm2` (vendor-neutral,
+  `export-templates/openqasm2.qasm` — accepted by nearly every gate-model
+  provider's toolchain, which is why it covers "other IDEs/hardware" more
+  cheaply than adding vendor SDKs one at a time; see the research doc).
+  **OpenQASM 2.0, not 3**: 3 was the original choice but OpenQASM 3 import
+  support proved inconsistent in practice — IBM Quantum Composer threw parse
+  errors on it — so the vendor-neutral target was downgraded to the older,
+  far more universally supported 2.0. If OpenQASM 3 support matures broadly
+  later, that's a case for *adding* a third target, not reverting this one.
 - **Only the ideal, unitary circuit is exported** — state prep (X) + H +
   CNOT + `Rᵧ(α0)`⊗`Rᵧ(α1)`. The app's `dephasing` slider is applied in
   `state.js` as a direct multiplication of off-diagonal density-matrix
@@ -356,7 +361,7 @@ this, not just this summary.
 - `buildPlaceholders(model, now)` is pure — computes every `@@TOKEN@@` ->
   string value pair (input bits, rotation angles in both radians and
   degrees, Bell-state label/equation, conditional X-gate lines for
-  OpenQASM 3) from the model, independent of which template consumes them.
+  OpenQASM 2.0) from the model, independent of which template consumes them.
 - `renderTemplate(template, placeholders)` is pure — global substitution,
   throws if the template references a token with no placeholder value
   (typo guard, not a silent pass-through).
@@ -373,7 +378,7 @@ this, not just this summary.
   `#export-circuit` button, in a `.export-circuit-fieldset` at the bottom of
   `<main>`, below the matrix/Bloch/sidebar `.layout` and above the footer.
 - Bit-order caveat baked into both templates' comments: Qiskit/most OpenQASM
-  3 runtimes report measurement counts little-endian (rightmost character is
+  toolchains report measurement counts little-endian (rightmost character is
   qubit 0), while this app's basis labels read q0 then q1 left to right —
   get this backwards and outcomes silently swap for any non-symmetric θ.
 - **Build-time validation** (`test/circuit-export-syntax.test.js`, part of
@@ -383,8 +388,8 @@ this, not just this summary.
   out to the system's `python3 -c "import ast; ast.parse(...)"` (stdin, no
   temp files); skips gracefully if `python3` isn't found locally, but
   GitHub Actions' `ubuntu-latest` runner ships `python3`, so CI always runs
-  it for real. `openqasm3.qasm` has no zero-dependency real parser
-  available, so it gets a structural heuristic (starts with `OPENQASM 3;`,
+  it for real. `openqasm2.qasm` has no zero-dependency real parser
+  available, so it gets a structural heuristic (starts with `OPENQASM 2.0;`,
   balanced braces, every statement line ends in `;`/`{`/`}`) in the same
   "deliberately conservative, not a full parser" spirit as
   `scripts/check-i18n-coverage.js` — documented as a heuristic, not oversold
