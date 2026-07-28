@@ -1,9 +1,11 @@
 """Integration/smoke test for the Phi+ Bell-state circuit via Qiskit Runtime.
 
-Mode (local AerSimulator vs. real IBM Cloud simulator backend) is decided by
-run_circuit.select_backend() based on QISKIT_IBM_TOKEN -- see that module's
-docstring. This lets the same test run as a zero-secret pull_request check
-and as the scheduled cloud integration test; only the environment differs.
+Mode (plain local AerSimulator vs. a local AerSimulator seeded with a real
+IBM backend's noise snapshot, after a genuine IBM Cloud auth round-trip) is
+decided by run_circuit.select_backend() based on QISKIT_IBM_TOKEN -- see
+that module's docstring. This lets the same test run as a zero-secret
+pull_request check and as the scheduled cloud integration test; only the
+environment differs.
 
 Plain assert + sys.exit, no test framework -- mirrors this repo's own
 "Node's built-in assert, no test framework" convention (see CLAUDE.md's

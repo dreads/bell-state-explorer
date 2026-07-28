@@ -1,12 +1,14 @@
 name: Qiskit Runtime Cloud Integration
 
-# Daily, simulator-only integration test against real IBM Cloud Qiskit
-# Runtime -- never targets a QPU (qiskit-runtime/run_circuit.py's
-# least_busy(simulator=True, ...) call enforces that). Scheduled + manual
-# only, same pattern as upstream Qiskit/qiskit-ibm-runtime's own
-# integration-tests.yml, to keep cloud usage bounded and predictable rather
-# than running on every push. Gated to this repo's owner so the secrets
-# below are never evaluated on a fork. See CLAUDE.md's
+# Daily integration test against real IBM Cloud Qiskit Runtime -- never
+# submits a job to a QPU's queue (qiskit-runtime/run_circuit.py only reads a
+# real backend's calibration snapshot via AerSimulator.from_backend() and
+# executes locally; IBM retired cloud-hosted simulator backends on
+# 2024-05-15, so there is no cloud simulator left to submit to either).
+# Scheduled + manual only, same pattern as upstream Qiskit/qiskit-ibm-runtime's
+# own integration-tests.yml, to keep cloud usage bounded and predictable
+# rather than running on every push. Gated to this repo's owner so the
+# secrets below are never evaluated on a fork. See CLAUDE.md's
 # "Added: CI/CD (Qiskit Runtime integration)" section.
 on:
   schedule:

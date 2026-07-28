@@ -14,10 +14,23 @@ quantum execution. Full rationale lives in `CLAUDE.md`'s
 via `SamplerV2`. Which backend it uses is decided automatically:
 
 - **`QISKIT_IBM_TOKEN` unset** -> local `AerSimulator`, no auth, no network.
-- **`QISKIT_IBM_TOKEN` set** -> real IBM Cloud, via
-  `QiskitRuntimeService.least_busy(simulator=True, operational=True)` --
-  dynamic discovery of whichever cloud simulator backend has the shortest
-  queue right now, never a hardcoded backend name.
+- **`QISKIT_IBM_TOKEN` set** -> real IBM Cloud auth, then local simulation
+  again. IBM retired cloud-hosted simulator backends on 2024-05-15, so
+  there's no cloud simulator left to submit to (`least_busy(simulator=True,
+  ...)` now always raises `QiskitBackendNotFoundError`). Instead:
+  1. `verify_cloud_connection()` calls `service.jobs(limit=1)` -- a real
+     round-trip to the IBM Cloud Runtime API that only needs a valid
+     token + instance CRN, independent of which backends that instance's
+     plan can see. This is the actual "did we really reach IBM Cloud" check.
+  2. `service.least_busy(operational=True, simulator=False)` picks a real,
+     currently-operational QPU -- purely to read its calibration snapshot.
+  3. `AerSimulator.from_backend(real_backend)` builds a noise-aware local
+     simulator from that snapshot, and the circuit runs on it locally.
+
+  Nothing is ever queued on IBM's side in either mode -- step 2 is a
+  backend-inspection call, not a job submission -- so cloud mode still
+  costs zero queue time/quota, it just also proves real connectivity via
+  step 1.
 
 `test_integration.py` calls the same function and asserts
 `p('00') + p('11')` clears `CORRELATED_THRESHOLD` (0.9).
@@ -52,11 +65,12 @@ docker run --rm -e QISKIT_IBM_TOKEN -e QISKIT_IBM_INSTANCE qiskit-runtime-dev   
 
 ## Cost / quota
 
-Local mode is free and instant. Cloud mode consumes your IBM Cloud Qiskit
-Runtime quota even when targeting a simulator backend, depending on your
-plan -- the scheduled workflow (`.github/workflows/qiskit-runtime-cloud-integration.yml`)
-runs daily and is simulator-only by design (never targets a real QPU); see
-CLAUDE.md if you want to change that cadence.
+Both modes execute the circuit locally and are free/instant. "Cloud" mode
+additionally makes two lightweight, no-cost IBM Cloud API calls (list
+recent jobs, read one backend's calibration data) to authenticate for real
+and fetch a noise snapshot -- it never submits a job to a QPU's queue. The
+scheduled workflow (`.github/workflows/qiskit-runtime-cloud-integration.yml`)
+runs daily; see CLAUDE.md if you want to change that cadence.
 
 ## Where the CRN/token come from
 

@@ -1,6 +1,20 @@
 """Builds the canonical Bell-state (Phi+) circuit and submits it via Qiskit
-Runtime's SamplerV2 -- either to a local AerSimulator (no auth needed) or to
-a real IBM Cloud simulator backend chosen by shortest queue.
+Runtime's SamplerV2 -- either to a local AerSimulator (no auth needed) or,
+in "cloud" mode, to a local AerSimulator seeded with a real IBM backend's
+noise snapshot (auth needed, but nothing is queued on IBM's side).
+
+IBM retired cloud-hosted simulator backends on 2024-05-15 (see
+https://quantum.cloud.ibm.com/docs/en/guides/local-simulators), so
+`QiskitRuntimeService.least_busy(simulator=True, ...)` can never match
+anything anymore -- that's the source of the
+`QiskitBackendNotFoundError: 'No backend matches the criteria.'` this
+replaced. IBM's own documented replacement is local noise-aware simulation:
+fetch a real QPU's calibration data and run `AerSimulator.from_backend(...)`
+locally. Fetching calibration data is a backend-inspection API call, not a
+job submission, so this still costs zero queue time/quota -- it preserves
+the "never submits a job to a real QPU from CI" constraint from CLAUDE.md,
+just via a different mechanism (local execution) than before (filtering
+QPUs out of backend selection).
 
 Mode is selected automatically: QISKIT_IBM_TOKEN present -> cloud, absent ->
 local. This is what lets the same code run as a zero-secret pull_request
@@ -35,6 +49,18 @@ def build_phi_plus_circuit():
     return qc
 
 
+def verify_cloud_connection(service):
+    """Cheap, genuine round-trip to the IBM Cloud Runtime API: listing job
+    history only requires a valid token + instance CRN to authenticate, and
+    succeeds (returning zero or more jobs) regardless of which backends --
+    simulator or QPU -- that instance's plan can see. This is what actually
+    proves "we talked to real IBM Cloud", independent of and prior to any
+    backend selection, so a credential/instance problem surfaces here with
+    a clear cause instead of downstream as a confusing backend-matching
+    error."""
+    return len(list(service.jobs(limit=1)))
+
+
 def select_backend():
     token = os.environ.get("QISKIT_IBM_TOKEN")
     if not token:
@@ -42,14 +68,24 @@ def select_backend():
 
         return AerSimulator(), "local-aer"
 
+    from qiskit_aer import AerSimulator
     from qiskit_ibm_runtime import QiskitRuntimeService
 
     instance = os.environ.get("QISKIT_IBM_INSTANCE")
     service = QiskitRuntimeService(
         channel="ibm_quantum_platform", token=token, instance=instance
     )
-    backend = service.least_busy(simulator=True, operational=True)
-    return backend, backend.name
+
+    job_count = verify_cloud_connection(service)
+
+    # No cloud simulators exist anymore, so pick a real, operational QPU --
+    # simulator=False is explicit, not a leftover default -- purely to read
+    # its calibration snapshot. The circuit itself still never touches
+    # IBM's queue: AerSimulator.from_backend() runs entirely locally.
+    real_backend = service.least_busy(operational=True, simulator=False)
+    backend = AerSimulator.from_backend(real_backend)
+    name = f"aer-noise[{real_backend.name}] (cloud connection verified, {job_count} recent job(s) visible)"
+    return backend, name
 
 
 def run_bell_state(shots=SHOTS):
