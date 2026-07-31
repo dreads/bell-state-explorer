@@ -453,14 +453,21 @@ the renderer modules). This is enforced two ways:
 
 - `npm run lint:i18n` (`scripts/check-i18n-coverage.js`, zero dependencies)
   scans for untagged static text, hardcoded `.textContent` literals, drift
-  between `index.html`'s `<title>`/meta description and `locales/en.js`, and
+  between `index.html`'s `<title>`/meta description and `locales/en.json`, and
   `data-i18n` values that don't resolve to a real key. It runs in CI on every
   push (see `.github/workflows/deploy.yml`) and fails the build if it finds
   anything.
 - `test/locale-bundles.test.js` (part of `npm test`) shape-validates every
-  `locales/*.json` bundle against what `locales/en.js` actually defines —
+  `locales/*.json` bundle against what `locales/en.json` actually defines —
   catching typos and malformed metadata before they reach a screen reader or
   a user.
+
+`locales/en.json` is the single source of truth for English — there's no
+separate `.js` copy to keep in sync. It's fetched the same way every other
+locale is (`app.js`'s `ensureEnglish()`), just awaited once up front, before
+the first `render()`, since this app's readouts and sr-only descriptions are
+computed by JS with no static HTML text to fall back on while that fetch is
+in flight.
 
 Genuinely non-translatable content — bra-ket notation, `q0`/`q1`, the
 picker's own "English" option — is marked `data-i18n-exempt` rather than
@@ -518,8 +525,8 @@ src/i18n.js                             translate()/interpolate()/fallback looku
 src/locale-loader.js                    locale discovery/fetch, fetch injectable — no DOM
 src/app.js                              control wiring
 src/styles.css                          light and dark themes
-locales/en.js                           source-of-truth English string bundle (static import)
-locales/en.json, en-US.json, en-UK.json JSON mirror + regional English bundles (fetched)
+locales/en.json                         source-of-truth English bundle (fetched, same as every other locale)
+locales/en-US.json, en-UK.json          regional English bundles (fetched)
 locales/es.json                         contributed Spanish bundle
 locales/manifest.json                   language-picker option list (not used for auto-detection)
 locales/qaa.json, qab.json, qac.json    mock/test-only locales, commented out by default

@@ -20,19 +20,39 @@ import { buildExportPayload } from './export.js';
 import { EXPORT_TARGETS, loadCircuitExport } from './circuit-export.js';
 import { translate } from './i18n.js';
 import { loadManifest, loadLocaleBundle, detectLocale } from './locale-loader.js';
-import en from '../locales/en.js';
 
 const LOCALE_STORAGE_KEY = 'bell-state-locale';
 
-// `en` is always the fallback bundle, so any locale — including a partial
-// PR-contributed one — degrades to English per-key rather than breaking.
-// `activeLocale` starts as `en` so the first paint is never blank while
-// initLocale() resolves a saved preference or auto-detected match.
-let activeLocale = en;
+// English is fetched from locales/en.json — the single source of truth for
+// English strings, same as every other locale, no separate .js copy to keep
+// in sync (ported from nv-mag-explorer, which reused this project's i18n
+// system). Cached as a singleton promise so repeated calls (e.g. switching
+// the picker back to "en") never re-fetch.
+let englishBundle = null;
+let englishPromise = null;
+function ensureEnglish() {
+  if (englishBundle) return Promise.resolve(englishBundle);
+  if (!englishPromise) {
+    englishPromise = loadLocaleBundle('en').then((bundle) => {
+      englishBundle = bundle;
+      englishPromise = null;
+      return bundle;
+    });
+  }
+  return englishPromise;
+}
+
+// Unlike nv-mag-explorer's static page — where the default-English DOM text
+// needs no JS at all, so English can be fetched lazily only once a locale
+// switch actually needs it as a fallback — this app's readouts and sr-only
+// descriptions are computed by render() with no HTML text to fall back on.
+// So init() awaits ensureEnglish() once, up front, and only calls the first
+// render() after it resolves; `activeLocale` is never read before that.
+let activeLocale = null;
 
 /** Shorthand for translate() against the currently active locale. */
 function t(key, params) {
-  return translate(activeLocale.strings, en.strings, key, params);
+  return translate(activeLocale.strings, englishBundle.strings, key, params);
 }
 
 /** Resolves a flat list of keys under `namespace` into a { key: text } bag,
@@ -177,7 +197,7 @@ function populatePicker(manifestEntries) {
 
 async function onLocaleChange(code) {
   if (code === 'en') {
-    applyLocale(en);
+    applyLocale(await ensureEnglish());
     localStorage.setItem(LOCALE_STORAGE_KEY, 'en');
     return;
   }
@@ -195,8 +215,9 @@ async function onLocaleChange(code) {
  * locale: an explicit saved preference wins over auto-detection, which in
  * turn is tried independently of the manifest (see locale-loader.js) so a
  * bundle file copied straight into locales/ is found even with no manifest
- * entry at all. Runs after the first synchronous English render, so a slow
- * or failed fetch never blocks the initial paint.
+ * entry at all. Runs after init()'s first (English) render, so a slow or
+ * failed fetch of a *non-English* locale never blocks the initial paint —
+ * English itself was already awaited before that first render happened.
  */
 async function initLocale() {
   const manifest = await loadManifest();
@@ -330,8 +351,9 @@ async function exportCircuit() {
   }
 }
 
-function init() {
+async function init() {
   query();
+  activeLocale = await ensureEnglish();
   applyStaticText();
   draw = createMatrixGrid(dom.grid);
   drawBloch = createBlochSpheres(dom['bloch-spheres']);

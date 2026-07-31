@@ -73,7 +73,7 @@ export function purity(rho) {
 
 /**
  * Classify the current state into one of five qualitative regimes, for a
- * presentation layer to map to localized prose (see locales/en.js). This
+ * presentation layer to map to localized prose (see locales/en.json). This
  * function returns only a key — deliberately no natural-language strings —
  * so the branching logic (which regime applies) stays in one place and
  * language never needs to be threaded through it.
