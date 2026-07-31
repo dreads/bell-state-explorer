@@ -1,8 +1,10 @@
 /**
- * Discovers and loads locale bundles contributed via PR (locales/<code>.json).
- * English itself is never fetched — it's the static `locales/en.js` import
- * and always available — so every function here is about finding something
- * *other than* English, with `null`/`[]` meaning "nothing found, use English."
+ * Discovers and loads locale bundles, including English (locales/<code>.json,
+ * `en` is not special-cased here — see app.js's ensureEnglish(), which fetches
+ * it via loadLocaleBundle('en') the same as any other locale). `detectLocale`
+ * below still treats "en" as a stopping point rather than a fetch target,
+ * since English never needs auto-detecting — it's the built-in default.
+ * `null`/`[]` throughout means "nothing found, default render stands."
  */
 
 /**

@@ -24,8 +24,8 @@ src/i18n.js                              translate()/fallback lookup — no DOM 
 src/locale-loader.js                     locale discovery/fetch, fetch injectable — no DOM dependency
 src/app.js                               control wiring
 src/styles.css                           light/dark themes via CSS variables
-locales/en.js                            source-of-truth English bundle (static import)
-locales/en.json, en-US.json, en-UK.json  JSON mirror + regional English bundles (fetched, not statically imported)
+locales/en.json                          source-of-truth English bundle (fetched, same as every other locale)
+locales/en-US.json, en-UK.json           regional English bundles (fetched)
 locales/es.json                          contributed Spanish bundle
 locales/manifest.json                    picker option list only — not used for detection
 locales/qaa.json, qab.json, qac.json     mock/test-only locales, commented out by default
@@ -62,7 +62,7 @@ qiskit-runtime/                          separate Python subproject, see its own
 - `classifyState({ conc, pur, dephasing, theta })` → one of 5 kebab-case regime
   keys (`fully-dephased`, `product-state`, `maximally-entangled`, `pure-partial`,
   `partially-dephased`). Pure branching logic, deliberately no prose — see
-  `locales/en.js` for the strings and `src/i18n.js` for the lookup
+  `locales/en.json` for the strings and `src/i18n.js` for the lookup
 - `bellFromInput(q0, q1)` → `{ negative, psi }` — maps H+CNOT input bits to Bell state
 - `stateLabel({ psi, negative })` → Unicode ket string
 
@@ -215,17 +215,27 @@ PR** — this project has no live/user-submitted content pipeline, no
   `stateEquationBody({psi,negative})` splits the "(|00⟩ + |11⟩)/√2" half out
   of `stateEquation()` so the bell-row list can display it separately.
 - **Every user-visible/accessibility-relevant string in the app is now
-  externalized** (not just `interpret.*`) — `locales/en.js`'s `strings` tree
+  externalized** (not just `interpret.*`) — `locales/en.json`'s `strings` tree
   has five namespaces: `interpret`, `ui` (static chrome + app.js's small
   templates), `matrixGrid`, `blochSphere`, `circuitDiagram`. Math/ket
   notation, basis labels (`00`/`01`/`10`/`11`), axis letters, gate labels
   (`H`/`Ry`), and `q0`/`q1` identifiers stay hardcoded by design — they're
-  notation, not language. `STRINGS_VERSION` (bump on any shape change) is
-  exported for other bundles' `meta.targetsVersion` to reference —
+  notation, not language. `meta.targetsVersion` (bump on any shape change) is
+  a plain literal for other bundles' `meta.targetsVersion` to reference —
   informational only, never enforced at runtime.
-- `locales/en.js` ships as a static ES module import (not fetched), so the
-  default language costs no network round-trip and the first paint is never
-  blank.
+- **`locales/en.json` is the single source of truth for English** — fetched
+  the same way as every other locale, via `app.js`'s `ensureEnglish()`
+  (`loadLocaleBundle('en')`, cached as a singleton promise). There is no
+  separate `.js` copy to keep in sync (this project used to ship one as a
+  static import specifically to avoid a network round-trip on first paint;
+  that duplication was removed in favor of a single JSON source, mirroring
+  [nv-mag-explorer](https://github.com/dreads/nv-mag-explorer), which reused
+  this project's i18n system). The tradeoff: `init()` now `await`s
+  `ensureEnglish()` once, before the very first `render()` — unlike
+  nv-mag-explorer's static page (no model/`render()`, so its default-English
+  DOM needs no JS and can fetch English lazily), this app's readouts and
+  sr-only descriptions are computed by `render()` with no HTML text to fall
+  back on, so first paint waits on that one same-origin JSON fetch.
 - **Static HTML text**: tag an element `data-i18n="namespace.key"` in
   `index.html` and it's picked up automatically — no per-string JS wiring.
   `app.js`'s `applyStaticText()` walks every `[data-i18n]` element plus
@@ -236,7 +246,7 @@ PR** — this project has no live/user-submitted content pipeline, no
   via the `t(key, params)` helper instead, so the two mechanisms never touch
   the same element.
 - `app.js`'s `t(key, params)` is a shorthand for
-  `translate(activeLocale.strings, en.strings, key, params)`;
+  `translate(activeLocale.strings, englishBundle.strings, key, params)`;
   `resolveStrings(namespace, keys)` resolves a flat key list into the
   `{ key: text }` bag the three renderer modules' `draw()` functions expect.
 - **matrix-grid.js / bloch-sphere.js / circuit-diagram.js** each take an
@@ -292,19 +302,23 @@ PR** — this project has no live/user-submitted content pipeline, no
 - `app.js`: `#locale-picker` `<select>` in `index.html`'s header.
   `applyLocale(bundle)` sets `activeLocale`, `document.documentElement.lang`
   /`.dir` from `bundle.meta`, adds a picker option if missing, and
-  re-renders. `initLocale()` runs after the first (English) render: resolves
-  a saved `localStorage` preference, else `detectLocale(navigator.languages)`,
-  and populates the picker from the manifest — all independently, so a slow
-  or failed fetch never blocks the initial paint.
+  re-renders. `init()` is now `async`: it `await`s `ensureEnglish()` before
+  the first `render()`, then calls `initLocale()` — which resolves a saved
+  `localStorage` preference, else `detectLocale(navigator.languages)`, and
+  populates the picker from the manifest — all independently, so a slow or
+  failed fetch of a *non-English* locale never blocks the initial paint
+  (English itself was already awaited by then).
 - `scripts/check-i18n-coverage.js` (`npm run lint:i18n`, zero dependencies,
   wired into the GHA workflow after `npm test`): flags index.html text-bearing
   tags without `data-i18n`/`data-i18n-exempt`, `<title>`/meta-description
-  drift from `locales/en.js`, `data-i18n` values that don't resolve to a real
+  drift from `locales/en.json`, `data-i18n` values that don't resolve to a real
   key (typo catcher), and hardcoded `.textContent = "literal"` assignments in
   `src/*.js`. It's a heuristic, not a parser — false positives get a
-  `data-i18n-exempt` next to the markup, not a script tweak.
+  `data-i18n-exempt` next to the markup, not a script tweak. It reads
+  `locales/en.json` itself via `fs.readFileSync` + `JSON.parse` (this is a
+  plain Node script, not a browser module, so it has no need for `fetch`).
 - `test/locale-bundles.test.js` hand-validates every `locales/*.json` (shape,
-  required meta, valid `direction`, no unknown section/key vs `locales/en.js`,
+  required meta, valid `direction`, no unknown section/key vs `locales/en.json`,
   all-string values) — this is what "tested" means in the contribution
   process below, enforced by `npm test`.
 

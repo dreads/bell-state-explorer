@@ -35,7 +35,7 @@
         },
         "targetsVersion": {
           "type": "string",
-          "description": "Which locales/en.js STRINGS_VERSION this bundle was written against. Informational — used to flag a bundle as possibly stale, never to reject it."
+          "description": "Which locales/en.json meta.targetsVersion this bundle was written against. Informational — used to flag a bundle as possibly stale, never to reject it."
         }
       }
     },

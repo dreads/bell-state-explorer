@@ -1,6 +1,6 @@
 /**
  * Minimal, dependency-free string lookup. A locale bundle is a plain nested
- * object (see locales/en.js); `key` is a dot path into it, e.g.
+ * object (see locales/en.json); `key` is a dot path into it, e.g.
  * "interpret.fully-dephased".
  */
 
