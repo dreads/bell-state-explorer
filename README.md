@@ -427,10 +427,14 @@ Three workflows, three jobs:
   deliberately scheduled outside the target device's post-calibration
   stabilization window (see `qiskit-runtime/WORKFLOWS.md` and the paper's
   Part 4 for the incident that taught us this).
-- **`.github/workflows/run-on-merge.yml`** — push to `main`.
-  `environment: prod`, gated behind required reviewers — the actual spend
-  gate. Submits the payload's circuit to real hardware and blocks for the
-  result.
+- **`.github/workflows/run-on-merge.yml`** — push to `main`, `paths:`-filtered
+  to the circuit/pipeline files that can actually change what's submitted
+  (plus manual `workflow_dispatch`) — an unrelated merge shouldn't trigger
+  real spend. `environment: prod`, gated behind required reviewers — the
+  spend gate. Merging the circuit change in the first place is a separate
+  gate, `.github/CODEOWNERS` — see `qiskit-runtime/WORKFLOWS.md` for why
+  both exist. Submits the payload's circuit to real hardware and blocks for
+  the result.
 
 `qiskit-runtime/Dockerfile` exists purely for local rehearsal — pinning the
 same Python/Qiskit versions CI uses so you can iterate without touching your
@@ -554,10 +558,11 @@ qiskit-runtime/circuits/hello_noise.*    sample payload, all three formats
 qiskit-runtime/WORKFLOWS.md              CI/physics contract, payload contract, accountability model
 doc/running-quantum-jobs-in-cicd.md     research narrative behind the CI/CD pipeline
 doc/CLAUDE_CODE_BUILD_SPEC-CICD-PIPELINE.md  build spec for the CI/CD pipeline
+.github/CODEOWNERS                      named-owner review required on circuit/pipeline paths before merge
 .github/workflows/deploy.yml            npm test + lint:i18n, then deploy to GitHub Pages
 .github/workflows/validate.yml          branch validation, no network/secrets
 .github/workflows/nightly.yml           scheduled device-health check (environment: dev)
-.github/workflows/run-on-merge.yml      real-hardware submission on push to main (environment: prod)
+.github/workflows/run-on-merge.yml      real-hardware submission, path-filtered, on push to main (environment: prod)
 ```
 
 `src/state.js`, `src/export.js`, `src/circuit-export.js`, `src/i18n.js`, and

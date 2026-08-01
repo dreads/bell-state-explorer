@@ -89,20 +89,31 @@ ungated-dev one, independent of anything GitHub's logs say. See
   (Quantum Platform dashboard -> Instances tab) as `QC_INSTANCE`.
 - Prefer narrowly-scoped, rotatable, limited-use keys.
 
-### 3. Branch protection: require `validate` on `main`
+### 3. Require CODEOWNERS review on circuit/pipeline paths
+
+`.github/CODEOWNERS` already scopes `qiskit-runtime/circuits/**` and
+`payload.py`/`submit.py`/`run.py` to a named owner — but it's inert until
+branch protection enforces it: Settings -> Branches -> branch protection
+rule for `main` -> enable "Require review from Code Owners". Update the
+`@dreads` owner in that file to whoever is actually accountable for
+reviewing circuit changes as the team grows. This is deliberately separate
+from the `prod` environment's required reviewers in step 1 — see
+`WORKFLOWS.md`'s accountability section for why both gates matter.
+
+### 4. Branch protection: require `validate` on `main`
 
 `validate.yml`'s `validate` job needs to run at least once before it's
 selectable. Then: Settings -> Branches -> branch protection rule for `main`
 -> "Require status checks to pass" -> add it.
 
-### 4. Signed commits
+### 5. Signed commits
 
 Circuit changes should be signed — the commit signature is the durable
 "who wrote this" record `WORKFLOWS.md`'s accountability model relies on.
 Consider requiring signed commits on `main` in the same branch protection
 rule.
 
-### 5. Enable IBM Cloud Activity Tracker
+### 6. Enable IBM Cloud Activity Tracker
 
 Account-level setting on IBM Cloud. Once on, it records (in CADF format)
 which Service ID submitted which job against which instance — the

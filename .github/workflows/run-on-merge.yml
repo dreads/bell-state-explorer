@@ -1,10 +1,15 @@
 name: Run on merge (real hardware)
 
 # Real IBM Quantum hardware submission, gated behind human approval. Runs
-# after a PR merges to main. environment: prod is the spend gate -- the
-# paid Service ID credential is physically unreachable until a required
-# reviewer approves this run (Settings -> Environments -> prod -> required
-# reviewers; this cannot be configured from YAML, see qiskit-runtime/README.md).
+# after a merge to main that actually touches the circuit or the pipeline
+# code that decides what gets submitted (see the paths: filter below) --
+# and can also be run manually via workflow_dispatch. environment: prod is
+# the spend gate -- the paid Service ID credential is physically
+# unreachable until a required reviewer approves this run (Settings ->
+# Environments -> prod -> required reviewers; this cannot be configured
+# from YAML, see qiskit-runtime/README.md). Separately, .github/CODEOWNERS
+# requires a named owner's review before a circuit-touching PR can even
+# merge -- see qiskit-runtime/WORKFLOWS.md for how the two gates differ.
 #
 # Blocking, not async: submit.submit_blocking() polls the real RuntimeJobV2
 # to completion (or QC_JOB_TIMEOUT_SEC) in this one step. See
@@ -15,6 +20,19 @@ on:
   push:
     branches:
       - main
+    # Scoped deliberately: spend should track circuit changes, not merge
+    # cadence. Without this, a README typo fix merged to main would trigger
+    # a real-hardware submission exactly like a genuine circuit change would
+    # -- same dollar cost, no new signal. Keep this list in sync with
+    # whatever actually decides what gets submitted (the payload itself,
+    # plus the pipeline code that resolves/transpiles/submits it) --
+    # anything that CAN'T change what runs on hardware doesn't belong here.
+    paths:
+      - 'qiskit-runtime/circuits/**'
+      - 'qiskit-runtime/payload.py'
+      - 'qiskit-runtime/submit.py'
+      - 'qiskit-runtime/run.py'
+  workflow_dispatch: {}
 
 jobs:
   run-on-hardware:

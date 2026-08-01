@@ -47,6 +47,7 @@ test/locale-bundles.test.js              shape-validates every locales/*.json bu
 qiskit-runtime/                          separate Python subproject, see its own README/WORKFLOWS.md + CI/CD section below
 doc/running-quantum-jobs-in-cicd.md      research narrative behind the qiskit-runtime/ CI/CD pipeline
 doc/CLAUDE_CODE_BUILD_SPEC-CICD-PIPELINE.md  standalone build spec for that pipeline
+.github/CODEOWNERS                       requires named-owner review on circuit/pipeline paths before merge
 .github/workflows/deploy.yml             npm test + lint:i18n, then deploy to GitHub Pages
 .github/workflows/validate.yml           branch validation for the quantum payload, no network/secrets
 .github/workflows/nightly.yml            scheduled device-health check (environment: dev)
@@ -492,19 +493,32 @@ read `WORKFLOWS.md` before changing any of this, not just this summary.
     Runs `make -C qiskit-runtime integration-test` under `environment: dev`
     (free/open instance credentials, no required reviewers — this run never
     spends QPU time).
-  - `.github/workflows/run-on-merge.yml` — trigger: `push` to `main`.
-    Runs `make -C qiskit-runtime run` under `environment: prod`, which
-    **must have required reviewers configured** (Settings -> Environments,
-    can't be set from YAML alone) — this is the actual spend gate for real
-    hardware submission.
+  - `.github/workflows/run-on-merge.yml` — trigger: `push` to `main`,
+    **`paths:`-filtered** to `qiskit-runtime/circuits/**` and
+    `payload.py`/`submit.py`/`run.py` (plus manual `workflow_dispatch`) —
+    deliberately *not* a bare push-to-main trigger, so real-hardware spend
+    tracks circuit changes rather than merge cadence; an unrelated merge
+    must not fire a paid job. Runs `make -C qiskit-runtime run` under
+    `environment: prod`, which **must have required reviewers configured**
+    (Settings -> Environments, can't be set from YAML alone) — the actual
+    spend gate for real hardware submission.
+- **Two gates of approval, not one — see `WORKFLOWS.md` for the full
+  detail.** `.github/CODEOWNERS` (checked into the repo, requires a named
+  owner's review before a circuit-touching PR can merge — needs "Require
+  review from Code Owners" enabled in branch protection to take effect) and
+  the `prod` environment's required-reviewer setting (config-only, gates
+  the *run*, not the merge) answer different questions — "is this diff
+  sound" vs. "should this spend money right now" — and neither substitutes
+  for the other.
 - **Two-axis config, three-identity accountability — see `WORKFLOWS.md` for
   the full detail.** Execution target (`simulator`/`qpu`) and environment
   (`dev`/`prod`, which carries credentials + approval) are kept
   independent, never collapsed into "dev means simulator." Author (signed
-  commits), approver (the `prod` environment's required-reviewer log), and
-  submitter (a per-environment IBM Cloud IAM Service ID, audited via
-  Activity Tracker) stay three separate identities in three independent
-  systems — `run.py`'s result JSON ties `$GITHUB_SHA` + `$GITHUB_RUN_ID` +
+  commits), approver (CODEOWNERS + the `prod` environment's
+  required-reviewer log, above), and submitter (a per-environment IBM
+  Cloud IAM Service ID, audited via Activity Tracker) stay three separate
+  identities in three independent systems — `run.py`'s result JSON ties
+  `$GITHUB_SHA` + `$GITHUB_RUN_ID` +
   the real `job_id` together so the three trails are cross-referenceable.
 - **Docker is local-dev-only.** `qiskit-runtime/Dockerfile` pins the exact
   Python/Qiskit versions for local rehearsal (`docker build` /

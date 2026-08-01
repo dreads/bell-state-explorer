@@ -99,7 +99,14 @@ never scrape log lines.
 |---|---|---|---|---|
 | `validate.py` | `make validate` | none | none | `validate.yml`, on every push/PR |
 | `test_integration.py` | `make integration-test` | yes (calibration pull only) | none | `nightly.yml`, scheduled |
-| `run.py` | `make run` | yes | yes, real QPU | `run-on-merge.yml`, on push to `main` |
+| `run.py` | `make run` | yes | yes, real QPU | `run-on-merge.yml`, on push to `main` (path-filtered) or manual dispatch |
+
+`run-on-merge.yml`'s trigger is scoped with `paths:` to
+`qiskit-runtime/circuits/**` plus `payload.py`/`submit.py`/`run.py` — not a
+bare "push to main." Spend should track circuit changes, not merge cadence;
+an unrelated merge (docs, app code, an unrelated test) must not trigger a
+real-hardware submission. Keep this list in sync with whatever actually
+decides what gets submitted.
 
 `test_integration.py` is the free device-health sensor: it authenticates,
 verifies the connection, pulls a real backend's live calibration, builds a
@@ -130,9 +137,27 @@ Do not hardcode "if environment == dev, use simulator" anywhere — read
 ## Accountability — three identities, never collapsed
 
 1. **Author** — signed git commits. Who wrote or changed the circuit.
-2. **Approver** — the `prod` GitHub Environment's required-reviewer record.
-   A claim by GitHub, under this org's control — necessary, not
-   independently sufficient.
+2. **Approver** — two separate gates, answering two different questions,
+   both required:
+   - **`.github/CODEOWNERS`** — a checked-in file requiring a named,
+     accountable owner's review before a PR touching
+     `qiskit-runtime/circuits/**` (or `payload.py`/`submit.py`/`run.py`)
+     can merge at all. This is the durable, visible record: it's part of
+     the repo, its own edits go through review, and every approval it
+     requires is permanently attached to that PR's history — discoverable
+     by anyone reading the PR, no admin access required. Answers "is this
+     specific diff sound."
+   - **The `prod` GitHub Environment's required-reviewer setting** — gates
+     the *run*, not the merge: `run-on-merge.yml` physically pauses until
+     a designated human approves spending real money right now. This
+     record lives in Settings → Environments, not in a diff — necessary,
+     but not independently sufficient, and not a substitute for
+     `CODEOWNERS`. Answers "should this specific execution spend money
+     right now."
+
+   Collapsing these into one gate loses the distinction between "someone
+   competent reviewed the change" and "someone authorized this spend" —
+   keep both.
 3. **Submitter** — an IBM Cloud IAM **Service ID**, never a human personal
    token. `dev` and `prod` each get their own Service ID (distinct key +
    instance pair), so IBM's own Activity Tracker (CADF audit events)
