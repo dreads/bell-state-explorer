@@ -1,80 +1,125 @@
 # Qiskit Runtime integration
 
-Separate Python subproject, deliberately outside `src/` -- the main app
-stays a zero-dependency static site (see repo root `CLAUDE.md`); this is
-CI/devops tooling that runs a real Bell-state circuit through
-[`qiskit-ibm-runtime`](https://github.com/Qiskit/qiskit-ibm-runtime) to
-cross-check `src/state.js`'s Phi+ math against an actual (simulated)
-quantum execution. Full rationale lives in `CLAUDE.md`'s
-"Added: CI/CD (Qiskit Runtime integration)" section -- read that first.
+Separate Python subproject, deliberately outside `src/` — the main app
+stays a zero-dependency static site (see repo root `CLAUDE.md`). This is
+CI/DevOps tooling that takes a data scientist's circuit payload — checked
+into this repo as OpenQASM 2.0, a Qiskit script, or a notebook — validates
+it cheaply on every branch, runs it for real on IBM Quantum hardware after
+merge to `main`, and runs a nightly job that doubles as a free device-health
+sensor. Full rationale (why no program-upload, the two-axis config model,
+the accountability model) lives in `WORKFLOWS.md`; this README covers
+running it locally and setting up the GitHub side.
 
-## Two modes, one script
+## The payload
 
-`run_circuit.py` builds the canonical Phi+ circuit (H + CNOT) and submits it
-via `SamplerV2`. Which backend it uses is decided automatically:
+`circuits/hello_noise.{qasm,py,ipynb}` is the sample payload, in all three
+accepted formats — see `WORKFLOWS.md` for the format contract. It's a
+2-qubit Bell (Phi+) circuit: H on q0, CNOT q0->q1, measure both. On an ideal
+simulator `p(00) + p(11) ~= 1.0`; that correlation degrading is the signal
+this pipeline reads as a proxy for device health.
 
-- **`QISKIT_IBM_TOKEN` unset** -> local `AerSimulator`, no auth, no network.
-- **`QISKIT_IBM_TOKEN` set** -> real IBM Cloud auth, then local simulation
-  again. IBM retired cloud-hosted simulator backends on 2024-05-15, so
-  there's no cloud simulator left to submit to (`least_busy(simulator=True,
-  ...)` now always raises `QiskitBackendNotFoundError`). Instead:
-  1. `verify_cloud_connection()` calls `service.jobs(limit=1)` -- a real
-     round-trip to the IBM Cloud Runtime API that only needs a valid
-     token + instance CRN, independent of which backends that instance's
-     plan can see. This is the actual "did we really reach IBM Cloud" check.
-  2. `service.least_busy(operational=True, simulator=False)` picks a real,
-     currently-operational QPU -- purely to read its calibration snapshot.
-  3. `AerSimulator.from_backend(real_backend)` builds a noise-aware local
-     simulator from that snapshot, and the circuit runs on it locally.
+`payload.py`'s `load_circuit(path)` resolves any of the three formats to
+the same `QuantumCircuit`. Point `QC_PAYLOAD_PATH` at your own payload to
+run something other than the sample.
 
-  Nothing is ever queued on IBM's side in either mode -- step 2 is a
-  backend-inspection call, not a job submission -- so cloud mode still
-  costs zero queue time/quota, it just also proves real connectivity via
-  step 1.
+## Three entrypoints
 
-`test_integration.py` calls the same function and asserts
-`p('00') + p('11')` clears `CORRELATED_THRESHOLD` (0.9).
-
-## Running locally
+| Command | What it does | Needs credentials? | Spends QPU time? |
+|---|---|---|---|
+| `make validate` | Structural + transpilation check only | no | no |
+| `make integration-test` | Pulls a real backend's live calibration, simulates locally, asserts a correlation floor | yes | no |
+| `make run` | Submits to real hardware, blocks for the result | yes | **yes** |
 
 ```bash
 make install
-make integration-test        # local AerSimulator, no credentials needed
+make validate              # no credentials needed
 ```
 
-To exercise the real cloud path locally (uses your own IBM Cloud quota):
+To run the calibration-pull check or a real hardware submission locally
+(uses your own IBM Cloud quota):
 
 ```bash
-export QISKIT_IBM_TOKEN=<your 44-char API key>
-export QISKIT_IBM_INSTANCE=<your instance CRN>
-make integration-test
+export QISKIT_IBM_TOKEN=<your Service ID API key>
+export QC_INSTANCE=<your instance CRN>
+make integration-test      # pulls calibration, simulates locally, no spend
+make run                   # submits to real hardware -- this one costs money
 ```
+
+See `WORKFLOWS.md` for the full `QC_*` env-var contract and defaults.
 
 ### Via Docker
 
 Pins the exact Python/Qiskit versions CI uses, without touching your host
-Python. This image is for local rehearsal only -- the GitHub Actions
-workflows install dependencies directly on `ubuntu-latest`, they don't use
-this Dockerfile.
+Python. Local rehearsal only — the GitHub Actions workflows install
+dependencies directly on `ubuntu-latest`, they don't use this image.
 
 ```bash
 docker build -t qiskit-runtime-dev .
-docker run --rm qiskit-runtime-dev                      # local sim
-docker run --rm -e QISKIT_IBM_TOKEN -e QISKIT_IBM_INSTANCE qiskit-runtime-dev   # cloud
+docker run --rm qiskit-runtime-dev                                    # make validate
+docker run --rm -e QISKIT_IBM_TOKEN -e QC_INSTANCE qiskit-runtime-dev  # cloud-connected targets
 ```
+
+## Setting up the GitHub side
+
+### 1. Two GitHub Environments: `dev` and `prod`
+
+Settings -> Environments -> New environment, twice.
+
+- **`dev`** — no required reviewers. Holds the free/open-instance
+  `QISKIT_IBM_TOKEN` + `QC_INSTANCE` secret pair. Used by `nightly.yml`,
+  which never spends QPU time.
+- **`prod`** — **add required reviewers** (Environments -> prod ->
+  "Required reviewers"). This is the actual spend gate: without it,
+  `run-on-merge.yml` can reach the paid credential with no human in the
+  loop. Holds the paid-instance `QISKIT_IBM_TOKEN` + `QC_INSTANCE` pair.
+
+### 2. Two distinct IBM Cloud IAM Service IDs
+
+Not two secrets sharing one identity — two actual Service IDs on IBM
+Cloud, each with its own scoped API key and its own instance. This is what
+lets IBM's own Activity Tracker distinguish a gated-prod submission from an
+ungated-dev one, independent of anything GitHub's logs say. See
+`WORKFLOWS.md`'s accountability section for why this matters.
+
+- IBM Cloud console -> **Manage -> Access (IAM) -> Service IDs** -> create
+  one for `dev`, one for `prod`.
+- Scope each via an **access group** to only the instance it needs.
+- Generate an API key per Service ID; store it as that environment's
+  `QISKIT_IBM_TOKEN` secret. Store the corresponding instance CRN
+  (Quantum Platform dashboard -> Instances tab) as `QC_INSTANCE`.
+- Prefer narrowly-scoped, rotatable, limited-use keys.
+
+### 3. Branch protection: require `validate` on `main`
+
+`validate.yml`'s `validate` job needs to run at least once before it's
+selectable. Then: Settings -> Branches -> branch protection rule for `main`
+-> "Require status checks to pass" -> add it.
+
+### 4. Signed commits
+
+Circuit changes should be signed — the commit signature is the durable
+"who wrote this" record `WORKFLOWS.md`'s accountability model relies on.
+Consider requiring signed commits on `main` in the same branch protection
+rule.
+
+### 5. Enable IBM Cloud Activity Tracker
+
+Account-level setting on IBM Cloud. Once on, it records (in CADF format)
+which Service ID submitted which job against which instance — the
+provider-side audit trail that doesn't depend on trusting GitHub. See
+`WORKFLOWS.md`.
 
 ## Cost / quota
 
-Both modes execute the circuit locally and are free/instant. "Cloud" mode
-additionally makes two lightweight, no-cost IBM Cloud API calls (list
-recent jobs, read one backend's calibration data) to authenticate for real
-and fetch a noise snapshot -- it never submits a job to a QPU's queue. The
-scheduled workflow (`.github/workflows/qiskit-runtime-cloud-integration.yml`)
-runs daily; see CLAUDE.md if you want to change that cadence.
+`validate` and `integration-test` are free — the latter authenticates and
+pulls calibration (two lightweight IBM Cloud API calls) but never queues a
+job. Only `run` (and therefore `run-on-merge.yml`, gated behind `prod`'s
+required reviewers) spends real QPU time and money.
 
-## Where the CRN/token come from
+## Repository variables
 
-IBM Quantum Platform dashboard -> **Instances** tab lists each instance with
-its CRN (`QISKIT_IBM_INSTANCE`). The API key (`QISKIT_IBM_TOKEN`) is on the
-dashboard's main page. Both are stored as GitHub Actions repo secrets for
-the cloud workflow -- see CLAUDE.md for the secret names expected.
+`QC_PAYLOAD_PATH` and `QC_BACKEND` are read as repo/environment variables
+(Settings -> Secrets and variables -> Actions -> Variables) by all three
+workflows, falling back to the sample payload and `ibm_marrakesh` if unset.
+Point `QC_PAYLOAD_PATH` at a scientist's checked-in payload once it exists;
+no workflow file needs to change.

@@ -1,0 +1,47 @@
+name: Run on merge (real hardware)
+
+# Real IBM Quantum hardware submission, gated behind human approval. Runs
+# after a PR merges to main. environment: prod is the spend gate -- the
+# paid Service ID credential is physically unreachable until a required
+# reviewer approves this run (Settings -> Environments -> prod -> required
+# reviewers; this cannot be configured from YAML, see qiskit-runtime/README.md).
+#
+# Blocking, not async: submit.submit_blocking() polls the real RuntimeJobV2
+# to completion (or QC_JOB_TIMEOUT_SEC) in this one step. See
+# qiskit-runtime/WORKFLOWS.md for why blocking is the deliberate choice for
+# now, and how the async upgrade path would reuse this same submit/read
+# split without a rewrite.
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  run-on-hardware:
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      QC_PAYLOAD_PATH: ${{ vars.QC_PAYLOAD_PATH || 'circuits/hello_noise.qasm' }}
+      QC_EXECUTION_TARGET: qpu
+      QC_BACKEND: ${{ vars.QC_BACKEND || 'ibm_marrakesh' }}
+      QC_CHANNEL: ibm_quantum_platform
+      QC_SHOTS: '4096'
+      QC_CORRELATION_THRESHOLD: '0.9'
+      QC_JOB_TIMEOUT_SEC: '1800'
+      QC_RESULT_PATH: result.json
+      QC_INSTANCE: ${{ secrets.QC_INSTANCE }}
+      QISKIT_IBM_TOKEN: ${{ secrets.QISKIT_IBM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r qiskit-runtime/requirements.txt
+      - run: make -C qiskit-runtime run
+      - if: always()
+        run: cat qiskit-runtime/result.json >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-on-merge-result-${{ github.run_id }}
+          path: qiskit-runtime/result.json

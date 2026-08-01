@@ -1,0 +1,53 @@
+name: Nightly device-health check
+
+# The free device-health sensor (see the accompanying paper's Part 4 and
+# WORKFLOWS.md). Authenticates to IBM Cloud, verifies the connection, pulls
+# a real backend's live calibration, builds a local Aer noise model from it,
+# and simulates the payload circuit locally -- asserting a correlation
+# floor. Never submits a job to the QPU queue: reading calibration is a
+# backend-inspection call, not a job submission, so this costs zero QPU
+# spend every single night.
+#
+# environment: dev -- free/open instance credentials, no required reviewers.
+# This run never spends QPU time, so it doesn't need the prod approval gate;
+# see the two-axis config model in qiskit-runtime/WORKFLOWS.md for why
+# environment and execution-target are kept independent.
+on:
+  schedule:
+    # Runs 02:00 UTC. Deliberately NOT in the device recalibration window.
+    # See issue #16: a nightly run inside the post-calibration stabilization
+    # window pulled degraded calibration and the simulated correlation
+    # collapsed to ~0.5 (noise) -- a false alarm caused by scheduling, not
+    # an actual device problem. Keep this in a clean 2-hour band; re-verify
+    # against the target device's actual calibration cadence before moving it.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  nightly-health-check:
+    if: github.repository_owner == 'dreads'
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      QC_PAYLOAD_PATH: ${{ vars.QC_PAYLOAD_PATH || 'circuits/hello_noise.qasm' }}
+      QC_EXECUTION_TARGET: simulator
+      QC_BACKEND: ${{ vars.QC_BACKEND || 'ibm_marrakesh' }}
+      QC_CHANNEL: ibm_quantum_platform
+      QC_CORRELATION_THRESHOLD: '0.9'
+      QC_RESULT_PATH: result.json
+      QC_INSTANCE: ${{ secrets.QC_INSTANCE }}
+      QISKIT_IBM_TOKEN: ${{ secrets.QISKIT_IBM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r qiskit-runtime/requirements.txt
+      - run: make -C qiskit-runtime integration-test
+      - if: always()
+        run: cat qiskit-runtime/result.json >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-health-result-${{ github.run_id }}
+          path: qiskit-runtime/result.json
