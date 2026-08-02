@@ -47,6 +47,7 @@ test/locale-bundles.test.js              shape-validates every locales/*.json bu
 qiskit-runtime/                          separate Python subproject, see its own README/WORKFLOWS.md + CI/CD section below
 doc/running-quantum-jobs-in-cicd.md      research narrative behind the qiskit-runtime/ CI/CD pipeline
 doc/CLAUDE_CODE_BUILD_SPEC-CICD-PIPELINE.md  standalone build spec for that pipeline
+doc/quantum-pipeline-faq.md              non-technical FAQ disambiguating pipeline results from unrelated headlines
 .github/CODEOWNERS                       requires named-owner review on circuit/pipeline paths before merge
 .github/workflows/deploy.yml             npm test + lint:i18n, then deploy to GitHub Pages
 .github/workflows/validate.yml           branch validation for the quantum payload, no network/secrets
@@ -459,6 +460,20 @@ read `WORKFLOWS.md` before changing any of this, not just this summary.
   never scrapes log lines, never touches Make internals, and never hardcodes
   which circuit runs. Defaults live in `qiskit-runtime/Makefile`, which is
   intentionally thin — glue over the Python entrypoints, not logic.
+- **`qiskit-runtime/report.py` turns the raw result into something
+  readable cold.** A bare `p(00)+p(11)` number and a pass/fail collapse
+  three very different situations into the same red X: a pipeline error
+  (nothing ran), a correlation drop on the tiny reference circuit (a real
+  device-health signal), and a correlation drop on a larger circuit (often
+  just expected physics at that qubit/depth, not a regression). All three
+  entrypoints now compute `circuit_complexity()` and add a plain-language
+  `interpretation` field via `interpret_validate()`/`interpret_execution()`,
+  and write a matching `result.summary.md` (via `write_result()`) that the
+  workflows feed into `$GITHUB_STEP_SUMMARY` instead of the raw JSON.
+  `doc/quantum-pipeline-faq.md` is the non-technical companion — written so
+  someone who heard "we're running quantum stuff" secondhand has somewhere
+  to go before misreading "noise"/"threshold" here as either the
+  encryption-breaking story or an unrelated error-correction headline.
 - **Cloud simulators are gone; `test_integration.py` uses IBM's documented
   replacement.** IBM retired cloud-hosted simulator backends on 2024-05-15
   (see https://quantum.cloud.ibm.com/docs/en/guides/local-simulators), so

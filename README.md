@@ -554,10 +554,12 @@ qiskit-runtime/submit.py                 PUB-building + blocking hardware submis
 qiskit-runtime/validate.py               no-network structural/transpile check
 qiskit-runtime/test_integration.py       calibration-pull + Aer-noise-model correlation-floor check
 qiskit-runtime/run.py                    real-hardware submission entrypoint
+qiskit-runtime/report.py                 plain-language interpretation + step-summary formatting
 qiskit-runtime/circuits/hello_noise.*    sample payload, all three formats
 qiskit-runtime/WORKFLOWS.md              CI/physics contract, payload contract, accountability model
 doc/running-quantum-jobs-in-cicd.md     research narrative behind the CI/CD pipeline
 doc/CLAUDE_CODE_BUILD_SPEC-CICD-PIPELINE.md  build spec for the CI/CD pipeline
+doc/quantum-pipeline-faq.md             non-technical FAQ for anyone reading a pipeline result cold
 .github/CODEOWNERS                      named-owner review required on circuit/pipeline paths before merge
 .github/workflows/deploy.yml            npm test + lint:i18n, then deploy to GitHub Pages
 .github/workflows/validate.yml          branch validation, no network/secrets

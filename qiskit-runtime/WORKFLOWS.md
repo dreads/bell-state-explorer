@@ -4,7 +4,10 @@ This is the DevOps-facing reference for `qiskit-runtime/`. If you're editing
 `.github/workflows/validate.yml`, `nightly.yml`, or `run-on-merge.yml`, or
 you're the data scientist checking in a circuit, this is the doc to read.
 The narrative *why* is in `../doc/running-quantum-jobs-in-cicd.md`; this file
-is the *what* — a stable contract, kept deliberately short.
+is the *what* — a stable contract, kept deliberately short. If you're a
+non-technical reader who ended up here because a result looked alarming,
+`../doc/quantum-pipeline-faq.md` is the shorter, plain-language version of
+this same page.
 
 ## The payload contract
 
@@ -81,17 +84,28 @@ works standalone; workflows override them, never edit the Makefile):
   "recent_jobs_visible": 1,
   "shots": 4096,
   "counts": {"00": 1051, "01": 1043, "10": 1024, "11": 978},
+  "num_qubits": 2,
+  "depth": 3,
   "p00_plus_p11": 0.4954,
   "threshold": 0.9,
   "passed": false,
   "job_id": null,
   "submitted_at": "2026-07-31T08:50:01Z",
-  "calibration_pulled_at": "2026-07-31T08:50:00Z"
+  "calibration_pulled_at": "2026-07-31T08:50:00Z",
+  "interpretation": "Correlation (0.4954) fell below the floor (0.9) on the small reference circuit (2 qubits, depth 3) on a locally-simulated noise model built from live calibration -- this is the device-health signal doing its job. Worth a look (device drift, a connectivity issue), not evidence of anything broken in the pipeline itself."
 }
 ```
 
-Workflows read this file for the job summary and artifact upload. They
-never scrape log lines.
+`interpretation` (added by `report.py`, alongside a matching
+`result.summary.md` written next to the JSON) is a plain-language sentence
+distinguishing a pipeline error from a genuine low-correlation result, and
+a low-correlation result on the tiny reference circuit from one on a
+circuit that's simply bigger than the reference and therefore expected to
+show more noise. It exists because the raw numbers alone read as an alarm
+regardless of which of those three very different situations actually
+happened — see `../doc/quantum-pipeline-faq.md`. Workflows read the JSON
+file for the artifact upload and the `.summary.md` file for the job
+summary. They never scrape log lines.
 
 ## Three entrypoints, three jobs
 

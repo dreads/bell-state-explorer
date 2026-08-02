@@ -7,6 +7,12 @@ not duplicate backend resolution or PUB-building -- those stay in
 submit.py's build_pub()/submit_blocking() so the async upgrade path
 (documented in WORKFLOWS.md, not built yet) can reuse them unchanged.
 
+Loads the circuit once more here (in addition to submit.py's own internal
+load) purely to report its qubit/depth complexity alongside the result --
+a cheap local parse, no network -- so a low correlation number on a real,
+larger circuit isn't read the same way as one on the tiny reference circuit.
+See report.py and doc/quantum-pipeline-faq.md.
+
 Accountability: the result JSON carries $GITHUB_SHA and $GITHUB_RUN_ID
 alongside the real job_id, so a single artifact ties author (signed commit
 SHA) to submission (IBM job id) -- see WORKFLOWS.md's accountability
@@ -16,12 +22,12 @@ repo entirely.
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
+from payload import load_circuit
+from report import circuit_complexity, interpret_execution, write_result
 from submit import submit_blocking
 
 QC_PAYLOAD_PATH = os.environ.get("QC_PAYLOAD_PATH", "circuits/hello_noise.qasm")
@@ -38,42 +44,70 @@ GITHUB_SHA = os.environ.get("GITHUB_SHA")
 GITHUB_RUN_ID = os.environ.get("GITHUB_RUN_ID")
 
 
-def _write_result(result: dict) -> None:
-    path = Path(QC_RESULT_PATH)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(result, indent=2))
+def _fail(reason: str) -> int:
+    print(f"FAIL: {reason}", file=sys.stderr)
+    write_result({
+        "mode": "qpu",
+        "payload_path": QC_PAYLOAD_PATH,
+        "backend_pinned": QC_BACKEND,
+        "instance": QC_INSTANCE,
+        "passed": False,
+        "job_id": None,
+        "error": reason,
+        "github_sha": GITHUB_SHA,
+        "github_run_id": GITHUB_RUN_ID,
+        "interpretation": interpret_execution(
+            mode="qpu", passed=False, p_correlated=None,
+            threshold=QC_CORRELATION_THRESHOLD, complexity=None, error=reason,
+        ),
+    }, QC_RESULT_PATH)
+    return 1
 
 
 def main() -> int:
+    try:
+        complexity = circuit_complexity(load_circuit(QC_PAYLOAD_PATH))
+    except Exception as e:  # noqa: BLE001 - surface a clean pipeline error
+        return _fail(f"{type(e).__name__}: {e}")
+
     submitted_at = datetime.now(timezone.utc).isoformat()
-    job_id, counts = submit_blocking(
-        QC_PAYLOAD_PATH,
-        token=QISKIT_IBM_TOKEN,
-        instance=QC_INSTANCE,
-        channel=QC_CHANNEL,
-        backend_name=QC_BACKEND,
-        shots=QC_SHOTS,
-        timeout_sec=QC_JOB_TIMEOUT_SEC,
-    )
+    try:
+        job_id, counts = submit_blocking(
+            QC_PAYLOAD_PATH,
+            token=QISKIT_IBM_TOKEN,
+            instance=QC_INSTANCE,
+            channel=QC_CHANNEL,
+            backend_name=QC_BACKEND,
+            shots=QC_SHOTS,
+            timeout_sec=QC_JOB_TIMEOUT_SEC,
+        )
+    except Exception as e:  # noqa: BLE001 - surface a clean pipeline error
+        return _fail(f"{type(e).__name__}: {e}")
 
     if counts is None:
         # Timed out. The job keeps running on IBM's side -- we do not cancel
         # it -- job_id is preserved here for later (manual, or future async
         # reaper) lookup.
         print(f"TIMEOUT: job {job_id} did not complete within {QC_JOB_TIMEOUT_SEC}s")
-        _write_result({
+        write_result({
             "mode": "qpu",
             "payload_path": QC_PAYLOAD_PATH,
             "backend_pinned": QC_BACKEND,
             "instance": QC_INSTANCE,
             "shots": QC_SHOTS,
+            **complexity,
             "job_id": job_id,
             "timed_out": True,
             "passed": False,
             "submitted_at": submitted_at,
             "github_sha": GITHUB_SHA,
             "github_run_id": GITHUB_RUN_ID,
-        })
+            "interpretation": interpret_execution(
+                mode="qpu", passed=False, p_correlated=None,
+                threshold=QC_CORRELATION_THRESHOLD, complexity=complexity,
+                timed_out=True,
+            ),
+        }, QC_RESULT_PATH)
         return 1
 
     total = sum(counts.values())
@@ -84,13 +118,23 @@ def main() -> int:
     print(f"counts: {counts}")
     print(f"p(00) + p(11) = {p_correlated:.4f} (threshold {QC_CORRELATION_THRESHOLD})")
 
-    _write_result({
+    interpretation = interpret_execution(
+        mode="qpu",
+        passed=passed,
+        p_correlated=p_correlated,
+        threshold=QC_CORRELATION_THRESHOLD,
+        complexity=complexity,
+    )
+    print(interpretation)
+
+    write_result({
         "mode": "qpu",
         "payload_path": QC_PAYLOAD_PATH,
         "backend_pinned": QC_BACKEND,
         "instance": QC_INSTANCE,
         "shots": total,
         "counts": {k: v for k, v in counts.items()},
+        **complexity,
         "p00_plus_p11": p_correlated,
         "threshold": QC_CORRELATION_THRESHOLD,
         "passed": passed,
@@ -99,7 +143,8 @@ def main() -> int:
         "submitted_at": submitted_at,
         "github_sha": GITHUB_SHA,
         "github_run_id": GITHUB_RUN_ID,
-    })
+        "interpretation": interpretation,
+    }, QC_RESULT_PATH)
 
     if not passed:
         print("FAIL: measured correlation below threshold", file=sys.stderr)

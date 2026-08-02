@@ -26,7 +26,7 @@ jobs:
       - run: pip install -r qiskit-runtime/requirements.txt
       - run: make -C qiskit-runtime validate
       - if: always()
-        run: cat qiskit-runtime/result.json >> "$GITHUB_STEP_SUMMARY"
+        run: cat qiskit-runtime/result.summary.md >> "$GITHUB_STEP_SUMMARY"
       - if: always()
         uses: actions/upload-artifact@v4
         with:

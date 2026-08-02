@@ -8,7 +8,9 @@ it cheaply on every branch, runs it for real on IBM Quantum hardware after
 merge to `main`, and runs a nightly job that doubles as a free device-health
 sensor. Full rationale (why no program-upload, the two-axis config model,
 the accountability model) lives in `WORKFLOWS.md`; this README covers
-running it locally and setting up the GitHub side.
+running it locally and setting up the GitHub side. If you got here because
+a result looked alarming and you don't write the circuits yourself, see
+`../doc/quantum-pipeline-faq.md` instead — it's written for that.
 
 ## The payload
 

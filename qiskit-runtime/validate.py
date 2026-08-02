@@ -13,34 +13,28 @@ not a stack trace mid-pipeline.
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
-from pathlib import Path
 
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
 
 from payload import PayloadError, load_circuit
+from report import circuit_complexity, interpret_validate, write_result
 
 QC_PAYLOAD_PATH = os.environ.get("QC_PAYLOAD_PATH", "circuits/hello_noise.qasm")
 QC_RESULT_PATH = os.environ.get("QC_RESULT_PATH", "result.json")
 
 
-def _write_result(result: dict) -> None:
-    path = Path(QC_RESULT_PATH)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(result, indent=2))
-
-
 def _fail(reason: str) -> int:
     print(f"FAIL: {reason}", file=sys.stderr)
-    _write_result({
+    write_result({
         "mode": "validate",
         "payload_path": QC_PAYLOAD_PATH,
         "passed": False,
         "error": reason,
-    })
+        "interpretation": interpret_validate(passed=False, error=reason, complexity=None),
+    }, QC_RESULT_PATH)
     return 1
 
 
@@ -64,17 +58,18 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001 - surface a clean pipeline error
         return _fail(f"circuit does not transpile: {e}")
 
+    complexity = circuit_complexity(circuit)
     print(
         f"PASS: {QC_PAYLOAD_PATH} loads and transpiles "
-        f"({circuit.num_qubits} qubits, {circuit.num_clbits} clbits)"
+        f"({complexity['num_qubits']} qubits, depth {complexity['depth']})"
     )
-    _write_result({
+    write_result({
         "mode": "validate",
         "payload_path": QC_PAYLOAD_PATH,
-        "num_qubits": circuit.num_qubits,
-        "num_clbits": circuit.num_clbits,
         "passed": True,
-    })
+        **complexity,
+        "interpretation": interpret_validate(passed=True, error=None, complexity=complexity),
+    }, QC_RESULT_PATH)
     return 0
 
 
