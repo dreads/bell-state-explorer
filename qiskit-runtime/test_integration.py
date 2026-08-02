@@ -26,6 +26,14 @@ interpret_execution() as a clean pipeline error, distinct from a genuine
 low-correlation result -- see doc/quantum-pipeline-faq.md for why that
 distinction matters to anyone reading this who isn't the one who wrote it.
 
+Transpiles locally (Qiskit's own pass manager, not IBM's cloud transpiler
+service) to the Aer noise-model backend's ISA before simulating -- this
+needs to happen fast and offline every night, and the noise model itself is
+already a local object (AerSimulator.from_backend()), so there's no cloud
+round-trip to make here. The cloud transpiler service is reserved for the
+real-hardware path in run.py/submit.py, where the actual target is a real
+IBM backend, not a local noise model built from one.
+
 Plain assert + sys.exit, no test framework -- mirrors this repo's own
 "Node's built-in assert, no test framework" convention (see root CLAUDE.md's
 Code conventions section) rather than adding pytest as a dependency.

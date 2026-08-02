@@ -40,9 +40,18 @@ That model is deprecated and gone. What actually happens:
 
 - The payload file (`.qasm`/`.py`/`.ipynb`) lives in **this repo**, under
   version control and review. It is never sent to IBM.
-- The pipeline resolves it to a `QuantumCircuit` locally, transpiles it to
-  the target backend's ISA locally, and submits **the compiled circuit**
-  as a Sampler PUB (`(isa_circuit,)`).
+- The pipeline resolves it to a `QuantumCircuit` locally, converts it to the
+  target backend's ISA via **IBM's cloud Qiskit Transpiler Service**
+  (`qiskit-ibm-transpiler`, in `submit.py`'s `build_pub`) — not a local
+  pass manager — and submits that ISA circuit as a Sampler PUB
+  (`(isa_circuit,)`). Letting IBM's own service perform the conversion for
+  a real hardware submission means the ISA circuit that actually runs was
+  produced by the same service the run itself depends on, not by
+  pipeline-side logic that could drift from what a given backend actually
+  needs. (`validate.py` and `test_integration.py` each still run a local,
+  no-cloud transpile pass for their own narrower purposes — a cheap
+  structural check and a same-process noise-model simulation — neither is
+  this conversion.)
 - The only things that persist on IBM's side are the **instance** (the CRN
   your credentials point at) and, per submission, a **`RuntimeJobV2` job
   id**. Neither is a program. `upload_program()` appears nowhere in this

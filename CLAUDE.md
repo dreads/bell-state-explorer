@@ -443,9 +443,13 @@ read `WORKFLOWS.md` before changing any of this, not just this summary.
   `load_circuit(path)` resolves any of the three to the same
   `QuantumCircuit`; every entrypoint below depends only on that object.
   There is no `upload_program()` anywhere in this codebase — what crosses
-  the wire to IBM is the locally-transpiled circuit, submitted as a
-  `SamplerV2` PUB (`qiskit-runtime/submit.py`'s `build_pub`/
-  `submit_blocking`), never the payload file itself.
+  the wire to IBM is the ISA circuit, submitted as a `SamplerV2` PUB
+  (`qiskit-runtime/submit.py`'s `build_pub`/`submit_blocking`), never the
+  payload file itself. ISA conversion for a real hardware run is done by
+  IBM's own cloud Qiskit Transpiler Service (`qiskit-ibm-transpiler`), not
+  a local pass manager — see `WORKFLOWS.md`'s no-program-upload section for
+  why, and why `validate.py`/`test_integration.py` each still use a local,
+  no-cloud transpile pass for their own narrower purposes instead.
 - **Three entrypoints, one env-var contract, one JSON result file.**
   `validate.py` (no network — structural/transpile check only),
   `test_integration.py` (connects to IBM Cloud, pulls a real backend's live
@@ -592,3 +596,8 @@ From README — areas where the codebase is designed to grow:
   the exemption is deliberate and discoverable, not indistinguishable from
   an oversight. Run `npm run lint:i18n` before committing any UI change —
   see "Added: i18n foundation" below for what it checks and its limits.
+
+## Writing conventions
+
+- Never use the phrase "full stop" in prose (docs, PRs, commit messages,
+  chat) — rephrase or just end the sentence with a period.

@@ -40,7 +40,7 @@ FAQ_POINTER = (
 def circuit_complexity(circuit) -> dict:
     """Qubit/clbit/depth/gate-count summary -- the context a bare
     correlation number needs to be read correctly. Computed from the
-    logical circuit as loaded, before transpilation (routing/ancilla
+    logical circuit as loaded, before any ISA conversion (routing/ancilla
     overhead from transpiling to a specific backend isn't what the
     scientist wrote, so it shouldn't be what gets reported as "the
     circuit's" complexity)."""

@@ -6,6 +6,15 @@ qubits/clbits. This is the cheap check that runs on every branch push and PR
 -- see WORKFLOWS.md for the black-box env-var contract this and its siblings
 (test_integration.py, run.py) all honor.
 
+The transpile check here is a *local*, cheap sanity check only -- Qiskit's
+own local pass manager against a generic AerSimulator target, catching
+"this circuit uses gates no real device could ever support" before anything
+expensive. It is deliberately not the same mechanism as the real hardware
+path: run.py converts to a specific backend's ISA via IBM's cloud-hosted
+Qiskit Transpiler Service (see submit.py), which needs credentials and
+network that this check -- run on every PR, including forks -- must not
+require.
+
 Malformed payloads (bad QASM, missing build_circuit, untagged/duplicately-
 tagged notebook, no measurements) are caught here via PayloadError -- raised
 by payload.load_circuit() itself -- and reported as a clean non-zero exit,
@@ -51,7 +60,8 @@ def main() -> int:
     # AerSimulator's generic target only confirms the circuit is
     # ISA-transpilable at all. It is a structural check, not a stand-in for
     # the real device's instruction set (that happens for real in
-    # test_integration.py / run.py, against a real backend).
+    # test_integration.py against a real backend's noise model, and in
+    # run.py via IBM's cloud transpiler service).
     try:
         pm = generate_preset_pass_manager(optimization_level=1, backend=AerSimulator())
         pm.run(circuit)
