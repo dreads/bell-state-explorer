@@ -1,0 +1,34 @@
+name: Validate quantum payload
+
+# Cheap branch-validation check for the scientist's checked-in circuit
+# payload (qiskit-runtime/circuits/*, or wherever QC_PAYLOAD_PATH points).
+# No network, no hardware, no secrets -- structural + transpilation checks
+# only (qiskit-runtime/validate.py). Safe to run on every push and PR,
+# including PRs from forks. See qiskit-runtime/WORKFLOWS.md for the
+# black-box CI/physics contract this and the other two workflows honor.
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      QC_PAYLOAD_PATH: ${{ vars.QC_PAYLOAD_PATH || 'circuits/hello_noise.qasm' }}
+      QC_RESULT_PATH: result.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r qiskit-runtime/requirements.txt
+      - run: make -C qiskit-runtime validate
+      - if: always()
+        run: cat qiskit-runtime/result.summary.md >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validate-result
+          path: qiskit-runtime/result.json

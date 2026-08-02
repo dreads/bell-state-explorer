@@ -1,7 +1,8 @@
-# Circuit export: viability research
+# Circuit formats: viability research
 
-This is the research the user asked for before building `src/circuit-export.js`:
-can the app export a circuit that a person can actually run — on a local
+_References to 'export' in this document refer to the ability of this code to provide the Bell circuit for downloading by the user. This document is unrelated to export regulations._
+
+Can the app export a circuit that a person can actually run — on a local
 simulator, on someone else's simulator, or on real quantum hardware — and get
 back numbers that are meaningfully comparable to what this app already shows?
 Answer: yes for a **subset** of what the app displays, with real constraints

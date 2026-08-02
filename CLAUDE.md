@@ -44,10 +44,15 @@ test/circuit-export-syntax.test.js       build-time validation that rendered tem
 test/i18n.test.js                        tests for i18n.js's lookup/fallback/interpolation
 test/locale-loader.test.js               tests for locale-loader.js (candidate expansion, fetch orchestration)
 test/locale-bundles.test.js              shape-validates every locales/*.json bundle
-qiskit-runtime/                          separate Python subproject, see its own README + CI/CD section below
+qiskit-runtime/                          separate Python subproject, see its own README/WORKFLOWS.md + CI/CD section below
+doc/running-quantum-jobs-in-cicd.md      research narrative behind the qiskit-runtime/ CI/CD pipeline
+doc/CLAUDE_CODE_BUILD_SPEC-CICD-PIPELINE.md  standalone build spec for that pipeline
+doc/quantum-pipeline-faq.md              non-technical FAQ disambiguating pipeline results from unrelated headlines
+.github/CODEOWNERS                       requires named-owner review on circuit/pipeline paths before merge
 .github/workflows/deploy.yml             npm test + lint:i18n, then deploy to GitHub Pages
-.github/workflows/qiskit-runtime-pr-check.yml           local-simulator-only PR check, no secrets
-.github/workflows/qiskit-runtime-cloud-integration.yml  daily real-IBM-Cloud integration test
+.github/workflows/validate.yml           branch validation for the quantum payload, no network/secrets
+.github/workflows/nightly.yml            scheduled device-health check (environment: dev)
+.github/workflows/run-on-merge.yml       real-hardware submission on push to main (environment: prod)
 ```
 
 ## Architecture
@@ -413,97 +418,145 @@ this, not just this summary.
   `scripts/check-i18n-coverage.js` — documented as a heuristic, not oversold
   as equivalent to the Python check.
 
-## Added: CI/CD (Qiskit Runtime integration)
+## Added: CI/CD (quantum-job pipeline in `qiskit-runtime/`)
 
 Independent of the app itself: `qiskit-runtime/` is a separate Python
 subproject (own `requirements.txt`, not part of the zero-dependency static
-site) that runs the canonical Phi+ Bell-state circuit through
-[`qiskit-ibm-runtime`](https://github.com/Qiskit/qiskit-ibm-runtime), as a
-real cross-check of `src/state.js`'s Phi+ math against an actual (simulated)
-execution, and as devops practice integrating with IBM Quantum Cloud's API
-from CI. Its own `qiskit-runtime/README.md` covers local usage; this section
-covers the CI/CD design and why it's shaped this way.
+site) implementing a full pipeline for taking a data scientist's quantum
+circuit — checked into the repo, not uploaded anywhere — from a branch push
+through validation, a free nightly device-health check, and (after human
+approval) a real run on IBM Quantum hardware. It grew out of an earlier
+single-script cross-check of `src/state.js`'s Phi+ math against a simulated
+execution; that script (`run_circuit.py`) has been retired in favor of the
+payload-driven design below. Full design rationale — the black-box
+env-var contract, the payload-format contract, why there's no program-upload
+step, the two-axis config model, the three-identity accountability model —
+is in `qiskit-runtime/WORKFLOWS.md`; the research narrative behind it is
+`doc/running-quantum-jobs-in-cicd.md`; the original build instructions are
+`doc/CLAUDE_CODE_BUILD_SPEC-CICD-PIPELINE.md`. This section is a summary —
+read `WORKFLOWS.md` before changing any of this, not just this summary.
 
-- **One script, two modes, both execute locally.** `qiskit-runtime/run_circuit.py`'s
-  `select_backend()` picks the backend from whether `QISKIT_IBM_TOKEN` is
-  set in the environment: unset -> plain local `AerSimulator` (no auth, no
-  network — this is Qiskit's own documented local-testing pattern, passing
-  a local simulator directly as `SamplerV2`'s `mode`); set -> a local
-  `AerSimulator.from_backend(...)` seeded with a real IBM backend's noise
-  snapshot, reached via a real IBM Cloud `QiskitRuntimeService` session.
-  `qiskit-runtime/test_integration.py` calls the same function and asserts
-  `p('00') + p('11')` clears `CORRELATED_THRESHOLD` (0.9) — both
-  `.github/workflows/qiskit-runtime-*.yml` below call the identical
-  `make -C qiskit-runtime integration-test` target; only the environment
-  (secrets present or not) differs between them, so there is exactly one
-  code path to maintain, not two.
-- **Cloud simulators are gone; this is IBM's documented replacement.** IBM
-  retired cloud-hosted simulator backends on 2024-05-15 (see
-  https://quantum.cloud.ibm.com/docs/en/guides/local-simulators) — the
-  original design here called
-  `QiskitRuntimeService.least_busy(simulator=True, operational=True)`,
-  which can never match anything anymore and fails with
-  `QiskitBackendNotFoundError: 'No backend matches the criteria.'` (this bit
-  us directly: the daily workflow started failing once IBM finished the
-  retirement, independent of anything in this repo changing). The fix
-  mirrors IBM's own guidance: `select_backend()` now calls
-  `service.least_busy(operational=True, simulator=False)` — explicit,
-  intentional selection of a real QPU — purely to read its calibration data
-  and hand it to `AerSimulator.from_backend()`; the circuit still runs
-  entirely locally. Reading calibration data is a backend-inspection API
-  call, not a job submission, so this preserves the original "never submits
-  a job to a real QPU from CI" cost/queue-time constraint — via a different
-  mechanism (local execution) than before (filtering QPUs out of selection
-  entirely).
-- **Connectivity is verified independently of backend selection.**
-  `select_backend()` first calls `verify_cloud_connection(service)`, which
-  lists recent jobs (`service.jobs(limit=1)`) — a real round-trip to the
-  IBM Cloud Runtime API that only needs a valid token + instance CRN,
-  regardless of which backends that instance's plan can see. This exists
-  because an instance's CRN may be scoped to QPU access only (no
-  simulator entitlement) — a case this project hit directly — so proving
-  "the token and instance actually authenticate" has to be decoupled from
-  "and this account can also see backend X." The job count is surfaced in
-  the returned backend name string for visibility in workflow logs.
+- **The payload is a repo artifact, never uploaded.** A scientist checks in
+  a circuit as `.qasm` (OpenQASM 2.0), `.py` (a module exposing
+  `build_circuit() -> QuantumCircuit`), or `.ipynb` (one code cell tagged
+  `circuit`, rest of the notebook ignored). `qiskit-runtime/payload.py`'s
+  `load_circuit(path)` resolves any of the three to the same
+  `QuantumCircuit`; every entrypoint below depends only on that object.
+  There is no `upload_program()` anywhere in this codebase — what crosses
+  the wire to IBM is the ISA circuit, submitted as a `SamplerV2` PUB
+  (`qiskit-runtime/submit.py`'s `build_pub`/`submit_blocking`), never the
+  payload file itself. ISA conversion for a real hardware run is done by
+  IBM's own cloud Qiskit Transpiler Service (`qiskit-ibm-transpiler`), not
+  a local pass manager — see `WORKFLOWS.md`'s no-program-upload section for
+  why, and why `validate.py`/`test_integration.py` each still use a local,
+  no-cloud transpile pass for their own narrower purposes instead.
+- **Three entrypoints, one env-var contract, one JSON result file.**
+  `validate.py` (no network — structural/transpile check only),
+  `test_integration.py` (connects to IBM Cloud, pulls a real backend's live
+  calibration, builds a local Aer noise model, simulates the payload
+  circuit against it, asserts `p(00)+p(11)` clears
+  `QC_CORRELATION_THRESHOLD` — **never submits a hardware job**), and
+  `run.py` (the real hardware path — thin wrapper over `submit.py`,
+  blocking with a timeout). All three read the same `QC_*` env vars
+  (`QC_PAYLOAD_PATH`, `QC_BACKEND`, `QC_INSTANCE`, `QC_CHANNEL`, `QC_SHOTS`,
+  `QC_CORRELATION_THRESHOLD`, `QC_JOB_TIMEOUT_SEC`, `QC_RESULT_PATH`) and
+  write the same result-JSON shape at `QC_RESULT_PATH` — the workflow YAML
+  never scrapes log lines, never touches Make internals, and never hardcodes
+  which circuit runs. Defaults live in `qiskit-runtime/Makefile`, which is
+  intentionally thin — glue over the Python entrypoints, not logic.
+- **`qiskit-runtime/report.py` turns the raw result into something
+  readable cold.** A bare `p(00)+p(11)` number and a pass/fail collapse
+  three very different situations into the same red X: a pipeline error
+  (nothing ran), a correlation drop on the tiny reference circuit (a real
+  device-health signal), and a correlation drop on a larger circuit (often
+  just expected physics at that qubit/depth, not a regression). All three
+  entrypoints now compute `circuit_complexity()` and add a plain-language
+  `interpretation` field via `interpret_validate()`/`interpret_execution()`,
+  and write a matching `result.summary.md` (via `write_result()`) that the
+  workflows feed into `$GITHUB_STEP_SUMMARY` instead of the raw JSON.
+  `doc/quantum-pipeline-faq.md` is the non-technical companion — written so
+  someone who heard "we're running quantum stuff" secondhand has somewhere
+  to go before misreading "noise"/"threshold" here as either the
+  encryption-breaking story or an unrelated error-correction headline.
+- **Cloud simulators are gone; `test_integration.py` uses IBM's documented
+  replacement.** IBM retired cloud-hosted simulator backends on 2024-05-15
+  (see https://quantum.cloud.ibm.com/docs/en/guides/local-simulators), so
+  `test_integration.py` pins a real backend by name (`service.backend(QC_BACKEND)`,
+  default `ibm_marrakesh`) purely to read its calibration and hand it to
+  `AerSimulator.from_backend()`; the circuit still runs entirely locally.
+  Reading calibration is a backend-inspection call, not a job submission, so
+  this preserves "never submits a job to a real QPU from the nightly check."
+  Connectivity is verified independently first
+  (`service.jobs(limit=1)`, a cheap round-trip that only needs a valid
+  token + instance CRN) — an instance's CRN may be scoped to QPU access only
+  with no simulator entitlement, a case this project hit directly, so
+  proving "the token and instance actually authenticate" is decoupled from
+  "and this account can also see backend X."
 - **`instance` is a CRN** (Cloud Resource Name), found on the IBM Quantum
   Platform dashboard's Instances tab. Current channel is
   `ibm_quantum_platform` (replaced the older `ibm_quantum`/`ibm_cloud`
   channel split — re-verify against IBM's docs before assuming this is
   still current, same caution `doc/quantum-export-research.md` already
   calls out for this fast-moving API surface).
-- **Two independent GHA workflows, not one, deliberately split by secret
-  exposure:**
-  - `.github/workflows/qiskit-runtime-pr-check.yml` — trigger:
-    `pull_request`. References no secrets at all, so it's safe on PRs from
-    forks. Runs the local-`AerSimulator` path only. Job name
-    `local-sim-check` is meant to be added as a **required status check**
-    (Settings -> Branches -> branch protection rule for `main` -> "Require
-    status checks to pass", after it's run at least once — this is a
-    one-time manual repo-settings step, not something the workflow file
-    itself can configure).
-  - `.github/workflows/qiskit-runtime-cloud-integration.yml` — trigger:
-    daily `schedule` (06:00 UTC) + `workflow_dispatch`, gated with
-    `if: github.repository_owner == 'dreads'`. Never triggers on
-    push/PR — this mirrors upstream `Qiskit/qiskit-ibm-runtime`'s own
-    `integration-tests.yml`/`smoke-tests.yml` (scheduled + manual only,
-    owner-gated), which itself runs on bare `ubuntu-latest` with no Docker
-    involved — the pattern this project's own workflow follows. Requires
-    two repo secrets: `QISKIT_IBM_TOKEN` (44-char API key) and
-    `QISKIT_IBM_INSTANCE` (CRN) — set these in Settings -> Secrets before
-    this workflow can pass; until then it will fail with an auth error,
-    which is expected, not a bug.
+- **Three independent GHA workflows, split by trigger and secret exposure:**
+  - `.github/workflows/validate.yml` — trigger: `push` (all branches except
+    `main`) + `pull_request`. References no secrets, safe on PRs from forks.
+    Runs `make -C qiskit-runtime validate` only — no network to IBM. Meant
+    to be added as a **required status check** (Settings -> Branches ->
+    branch protection for `main` -> "Require status checks to pass", a
+    one-time manual repo-settings step).
+  - `.github/workflows/nightly.yml` — trigger: daily `schedule` (02:00 UTC,
+    deliberately outside the target device's post-calibration stabilization
+    window — see issue #16 and the cron comment in the workflow file) +
+    `workflow_dispatch`, gated with `if: github.repository_owner == 'dreads'`.
+    Runs `make -C qiskit-runtime integration-test` under `environment: dev`
+    (free/open instance credentials, no required reviewers — this run never
+    spends QPU time).
+  - `.github/workflows/run-on-merge.yml` — trigger: `push` to `main`,
+    **`paths:`-filtered** to `qiskit-runtime/circuits/**` and
+    `payload.py`/`submit.py`/`run.py` (plus manual `workflow_dispatch`) —
+    deliberately *not* a bare push-to-main trigger, so real-hardware spend
+    tracks circuit changes rather than merge cadence; an unrelated merge
+    must not fire a paid job. Runs `make -C qiskit-runtime run` under
+    `environment: prod`, which **must have required reviewers configured**
+    (Settings -> Environments, can't be set from YAML alone) — the actual
+    spend gate for real hardware submission.
+- **Two gates of approval, not one — see `WORKFLOWS.md` for the full
+  detail.** `.github/CODEOWNERS` (checked into the repo, requires a named
+  owner's review before a circuit-touching PR can merge — needs "Require
+  review from Code Owners" enabled in branch protection to take effect) and
+  the `prod` environment's required-reviewer setting (config-only, gates
+  the *run*, not the merge) answer different questions — "is this diff
+  sound" vs. "should this spend money right now" — and neither substitutes
+  for the other.
+- **Two-axis config, three-identity accountability — see `WORKFLOWS.md` for
+  the full detail.** Execution target (`simulator`/`qpu`) and environment
+  (`dev`/`prod`, which carries credentials + approval) are kept
+  independent, never collapsed into "dev means simulator." Author (signed
+  commits), approver (CODEOWNERS + the `prod` environment's
+  required-reviewer log, above), and submitter (a per-environment IBM
+  Cloud IAM Service ID, audited via Activity Tracker) stay three separate
+  identities in three independent systems — `run.py`'s result JSON ties
+  `$GITHUB_SHA` + `$GITHUB_RUN_ID` +
+  the real `job_id` together so the three trails are cross-referenceable.
 - **Docker is local-dev-only.** `qiskit-runtime/Dockerfile` pins the exact
   Python/Qiskit versions for local rehearsal (`docker build` /
   `docker run`, see its README) so you can iterate without touching host
-  Python. Neither GHA workflow uses this image or builds/pushes it — the
-  runners already are isolated ephemeral containers, so adding an
+  Python. No GHA workflow uses this image or builds/pushes it — the
+  runners are already isolated ephemeral containers, so adding an
   image-build step to CI itself would be pure overhead with no reproducibility
   benefit upstream's own CI doesn't already get for free.
-- **Cost/quota discipline**: daily cadence + simulator-only is the ceiling
-  for automatic cloud usage this project should incur without a deliberate
-  decision to widen it (real QPU, tighter cadence) — don't change either
-  without accounting for the cost/queue-time tradeoff this section exists
-  to document.
+- **Cost/quota discipline**: nightly cadence + simulator-only for `dev`,
+  spend gated behind human approval for `prod`, is the ceiling for
+  automatic cloud usage this project should incur without a deliberate
+  decision to widen it (real QPU on a tighter cadence, a `test`/`staging`
+  environment) — don't change either without accounting for the
+  cost/queue-time tradeoff this section exists to document.
+- **Async submission is documented, not built.** `submit.py` already keeps
+  "submit" (`build_pub` + `SamplerV2.run`) and "read result" separable so a
+  future reaper workflow can poll outstanding `job_id`s without a rewrite —
+  see `WORKFLOWS.md`'s async section. Do not fuse them back together for
+  `run.py`'s convenience.
 
 ## Planned extension directions
 
@@ -543,3 +596,8 @@ From README — areas where the codebase is designed to grow:
   the exemption is deliberate and discoverable, not indistinguishable from
   an oversight. Run `npm run lint:i18n` before committing any UI change —
   see "Added: i18n foundation" below for what it checks and its limits.
+
+## Writing conventions
+
+- Never use the phrase "full stop" in prose (docs, PRs, commit messages,
+  chat) — rephrase or just end the sentence with a period.

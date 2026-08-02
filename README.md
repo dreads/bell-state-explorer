@@ -386,7 +386,7 @@ The full reasoning behind these decisions — what a fair simulator/hardware
 comparison actually requires (spoiler: state tomography for the coherences,
 not just measurement counts), which formats other vendors' toolchains
 accept, and a recommended shape for writing up a real run — is in
-[`doc/quantum-export-research.md`](doc/quantum-export-research.md).
+[`doc/quantum-export-research.md`](doc/quantum-format-research.md).
 
 **Maintaining this**: `test/circuit-export.test.js` covers placeholder
 values, template rendering, and the fetch-based loader.
@@ -397,46 +397,49 @@ braces, terminated statements) for `openqasm2.qasm`, since no
 zero-dependency OpenQASM parser exists. Any template edit should keep
 passing both.
 
-## CI/CD: Qiskit Runtime integration
+## CI/CD: quantum-job pipeline (`qiskit-runtime/`)
 
 `qiskit-runtime/` is a separate Python subproject — not part of the app's
-zero-dependency static site — that runs the app's canonical Φ⁺ Bell state
-through [`qiskit-ibm-runtime`](https://github.com/Qiskit/qiskit-ibm-runtime)
-as a real cross-check of `src/state.js`'s math against an actual (simulated)
-execution, and as a working example of wiring CI to IBM Quantum Cloud's API.
-See `qiskit-runtime/README.md` for local usage.
+zero-dependency static site — implementing a full CI/CD pipeline for running
+a data scientist's quantum circuit on real IBM Quantum hardware. It started
+as a single script cross-checking `src/state.js`'s Φ⁺ math against a
+simulated execution; it's now a three-stage pipeline (validate → nightly
+device-health check → run-on-merge) built around a payload contract that
+accepts a circuit as OpenQASM 2.0, a Qiskit script, or a notebook. See
+`qiskit-runtime/README.md` for local usage and GitHub/IBM Cloud setup, and
+`qiskit-runtime/WORKFLOWS.md` for the full design (the black-box env-var
+contract between CI and physics, the no-program-upload architecture, the
+two-axis config model, and the three-identity accountability model). The
+accompanying research narrative is `doc/running-quantum-jobs-in-cicd.md`.
 
-One script, two modes, both execute locally: `run_circuit.py` runs against a
-plain local `AerSimulator` when no `QISKIT_IBM_TOKEN` is set (no auth, no
-network). When it is set, it authenticates for real against IBM Cloud
-(`service.jobs(limit=1)`, a cheap round-trip that proves the token/instance
-actually work), reads a real QPU's calibration snapshot via
-`least_busy(operational=True, simulator=False)`, and runs the circuit
-locally against `AerSimulator.from_backend(...)` seeded with that snapshot —
-IBM retired cloud-hosted simulator backends on 2024-05-15, so there's no
-cloud simulator left to submit to; this is IBM's own documented replacement.
-Both GitHub Actions workflows below call the identical
-`make -C qiskit-runtime integration-test`; only the environment differs:
+Three workflows, three jobs:
 
-- **`.github/workflows/qiskit-runtime-pr-check.yml`** runs on every pull
-  request, references no secrets, and only ever exercises the local
-  simulator — safe on PRs from forks. Its `local-sim-check` job is meant to
-  be added as a required branch-protection status check for `main` (Settings
-  → Branches), which is a one-time manual repo setting, not something a
-  workflow file can turn on by itself.
-- **`.github/workflows/qiskit-runtime-cloud-integration.yml`** runs daily
-  plus on manual dispatch, gated to this repo's owner, and never submits a
-  job to a real QPU's queue — reading calibration data is a
-  backend-inspection call, not a job submission — to keep cost and queue
-  time predictable. It needs two repo secrets: `QISKIT_IBM_TOKEN` (your IBM
-  Cloud API key) and `QISKIT_IBM_INSTANCE` (your Qiskit Runtime instance's
-  CRN, found on the IBM Quantum Platform dashboard's Instances tab).
+- **`.github/workflows/validate.yml`** — every push (except `main`) and
+  every PR. No network, no secrets: structural + transpilation checks on
+  whatever `QC_PAYLOAD_PATH` points at. Safe on PRs from forks. Meant to be
+  added as a required branch-protection status check for `main` (Settings →
+  Branches), a one-time manual repo setting a workflow file can't turn on
+  by itself.
+- **`.github/workflows/nightly.yml`** — scheduled (`environment: dev`, no
+  spend gate needed since it never spends QPU time). Authenticates to IBM
+  Cloud, pulls a real backend's live calibration, and simulates the payload
+  circuit locally against it — a free device-health sensor. The cron is
+  deliberately scheduled outside the target device's post-calibration
+  stabilization window (see `qiskit-runtime/WORKFLOWS.md` and the paper's
+  Part 4 for the incident that taught us this).
+- **`.github/workflows/run-on-merge.yml`** — push to `main`, `paths:`-filtered
+  to the circuit/pipeline files that can actually change what's submitted
+  (plus manual `workflow_dispatch`) — an unrelated merge shouldn't trigger
+  real spend. `environment: prod`, gated behind required reviewers — the
+  spend gate. Merging the circuit change in the first place is a separate
+  gate, `.github/CODEOWNERS` — see `qiskit-runtime/WORKFLOWS.md` for why
+  both exist. Submits the payload's circuit to real hardware and blocks for
+  the result.
 
 `qiskit-runtime/Dockerfile` exists purely for local rehearsal — pinning the
 same Python/Qiskit versions CI uses so you can iterate without touching your
-host Python. Neither workflow builds or uses that image; both install
-dependencies directly on `ubuntu-latest`, the same way
-`Qiskit/qiskit-ibm-runtime`'s own CI does.
+host Python. No workflow builds or uses that image; all three install
+dependencies directly on `ubuntu-latest`.
 
 ## Internationalization
 
@@ -545,10 +548,23 @@ test/circuit-export-syntax.test.js      build-time validation that rendered temp
 test/i18n.test.js                       i18n.js lookup/fallback/interpolation tests
 test/locale-loader.test.js              locale-loader.js candidate-expansion/fetch-orchestration tests
 test/locale-bundles.test.js             shape-validates every locales/*.json bundle
-qiskit-runtime/                         separate Python subproject — see "CI/CD: Qiskit Runtime integration" above
+qiskit-runtime/                         separate Python subproject — see "CI/CD: quantum-job pipeline" above
+qiskit-runtime/payload.py                multi-format (.qasm/.py/.ipynb) circuit loader — no network
+qiskit-runtime/submit.py                 PUB-building + blocking hardware submission
+qiskit-runtime/validate.py               no-network structural/transpile check
+qiskit-runtime/test_integration.py       calibration-pull + Aer-noise-model correlation-floor check
+qiskit-runtime/run.py                    real-hardware submission entrypoint
+qiskit-runtime/report.py                 plain-language interpretation + step-summary formatting
+qiskit-runtime/circuits/hello_noise.*    sample payload, all three formats
+qiskit-runtime/WORKFLOWS.md              CI/physics contract, payload contract, accountability model
+doc/running-quantum-jobs-in-cicd.md     research narrative behind the CI/CD pipeline
+doc/CLAUDE_CODE_BUILD_SPEC-CICD-PIPELINE.md  build spec for the CI/CD pipeline
+doc/quantum-pipeline-faq.md             non-technical FAQ for anyone reading a pipeline result cold
+.github/CODEOWNERS                      named-owner review required on circuit/pipeline paths before merge
 .github/workflows/deploy.yml            npm test + lint:i18n, then deploy to GitHub Pages
-.github/workflows/qiskit-runtime-pr-check.yml           local-simulator-only PR check, no secrets
-.github/workflows/qiskit-runtime-cloud-integration.yml  daily real-IBM-Cloud integration test
+.github/workflows/validate.yml          branch validation, no network/secrets
+.github/workflows/nightly.yml           scheduled device-health check (environment: dev)
+.github/workflows/run-on-merge.yml      real-hardware submission, path-filtered, on push to main (environment: prod)
 ```
 
 `src/state.js`, `src/export.js`, `src/circuit-export.js`, `src/i18n.js`, and

@@ -1,0 +1,22 @@
+# Approver identity for the quantum-job CI/CD pipeline (see
+# qiskit-runtime/WORKFLOWS.md's accountability model, and the paper at
+# doc/running-quantum-jobs-in-cicd.md, Part 5).
+#
+# This file, not just the prod GitHub Environment's required-reviewer
+# setting, is the durable record of who is accountable for vouching for a
+# circuit change: it's checked into the repo, its own edits go through PR
+# review, and every approval it requires shows up directly in the PR's
+# review history -- discoverable by anyone reading the PR, not just someone
+# with access to Settings -> Environments. The environment's required
+# reviewers remain a separate, additional gate at RUN time (approving that
+# THIS specific execution should spend money right now); this file gates
+# MERGE time (approving that this specific diff is sound). Keep both --
+# they answer different questions.
+#
+# Update the owner below to reflect whoever is actually quantum-literate
+# and accountable for this pipeline as the team grows; a single owner
+# doesn't scale past one person's availability.
+/qiskit-runtime/circuits/   @dreads
+/qiskit-runtime/payload.py  @dreads
+/qiskit-runtime/submit.py   @dreads
+/qiskit-runtime/run.py      @dreads
