@@ -201,18 +201,6 @@ That reframing — from "the nightly job runs the circuit" to "the nightly job s
 
 ---
 
-### Sidebar: a cheaper road to "is the signal surviving?" — a respectful thought after reading the Google below-threshold work
-
-While trying to understand what "correlation below threshold" even means, I read the Google Quantum AI paper on quantum error correction below the surface code threshold — the Willow work, with Sivak among the many authors. I want to be clear up front: this is genuinely excellent, careful science by people who understand this vastly better than I do, and nothing here is a criticism. I am a newcomer reacting to it, and I want to plant a small thought, not correct anyone.
-
-What their work establishes, as I understand it, is that a logical qubit built from a surface code crosses *below threshold*: as you scale the code up, the logical error rate drops instead of rising — the signal survives and improves with scale, rather than drowning. They demonstrate this with a full apparatus: a distance-7 code, a real-time decoder, careful measurement of error-per-cycle. It is a landmark, and it took an enormous engineering effort to show cleanly.
-
-Here is the thought I keep coming back to, entirely as speculation. Their result answers a very deep version of a question that, in a much shallower and cruder form, my little nightly job is also asking: *is this device in a regime where the quantum signal survives, or where noise has drowned it?* They answer it rigorously, at the logical-qubit level, with a decoder and a code. My nightly job answers a pale shadow of it — "does a simulated Bell correlation, built from tonight's calibration, clear a floor?" — with nothing but a connection and a threshold.
-
-I am not for a second suggesting these are equivalent. They are not remotely equivalent. But it makes me wonder whether some of the *practical* question — "cheaply sense whether a device is currently in a good-enough regime to bother running on" — might eventually be reachable by much lighter means than a full QEC apparatus. Not the deep science; the operational early-warning. A correlation floor pulled from live calibration is almost embarrassingly cheap next to a real-time decoder, and yet on the night it went red, it *did* correctly tell us the device was in a bad state before we spent anything.
-
-So this is a seed I want to hand to people who actually know — perhaps someone inside IBM, watching their own devices' calibration streams. Is there a cheap, standing, connection-only signal that usefully approximates "is this device worth running on tonight," derivable from the calibration data that is already flowing, without any of the heavy machinery? I suspect the answer is more interesting than my toy version, and I would love to be shown how. Please treat this as a question from someone learning, not a claim.
-
 ---
 
 ## Part 5 — Accountability: do not collapse the identity model
@@ -301,7 +289,7 @@ Since the piece deliberately sits across three audiences — DevOps practitioner
 
 **For the DevOps / platform-engineering audience.** A hands-on writeup like this does well on a personal or engineering blog surfaced through the usual aggregators — Hacker News, `r/devops`, Lobsters, `dev.to`. The hook for this crowd is "CI/CD for an unfamiliar expensive workload," not the physics; lead with the pipeline and the two-axis config, and let the quantum be the interesting backdrop. The maintenance-window faceplant and the blocking-vs-async decision are the parts that will resonate here.
 
-**For the quantum-computing practitioner audience.** IBM's own Qiskit community channels (the Qiskit Slack, the IBM Quantum community forum, and IBM's developer/Qiskit blog if you want to pitch a guest or community post) are where people who could actually answer the Sivak-sidebar question and the nightly-sensor question live. This is also the most likely path to the "someone inside IBM" reader the sidebar is aimed at. The Quantum Computing Stack Exchange is a good place to pose the narrow technical questions (the correlation-floor-as-health-signal one especially) on their own. Medium's quantum-focused publications reach a broader, less specialist slice.
+**For the quantum-computing practitioner audience.** IBM's own Qiskit community channels (the Qiskit Slack, the IBM Quantum community forum, and IBM's developer/Qiskit blog if you want to pitch a guest or community post) are where people who could actually answer the nightly-sensor question live. The Quantum Computing Stack Exchange is a good place to pose the narrow technical question (the correlation-floor-as-health-signal one especially) on its own. Medium's quantum-focused publications reach a broader, less specialist slice.
 
 **For the governance / security audience.** The attack-surface sidebar is the part most likely to travel here, and it wants a different framing than the rest — foreground the opaque-expensive-workload and don't-collapse-the-trail argument, background the physics. LinkedIn reaches this crowd surprisingly well for exactly this kind of "here is an emerging operational question" piece, as do security-practitioner communities and newsletters. Given the current "Year of Quantum Security" attention, an editor at a security trade outlet might take a short opinion piece built around just that sidebar — but pitch it honestly as *the operational/CI angle*, explicitly distinct from the post-quantum-cryptography story everyone is already covering, or it will get pattern-matched to the wrong conversation and dismissed.
 
