@@ -1,6 +1,8 @@
 # Running quantum jobs through CI/CD, as a newcomer
 
-*This is a fictional scenario, not an account of anything that actually happened. I'm using it to think through what it would take to wire an unfamiliar, expensive kind of workload into a delivery pipeline — by imagining a specific, realistic team and circuit rather than staying abstract. The reasoning, the mistakes, the fixes — all constructed for the exercise, grounded in real experience standing up CI/CD for technology a team doesn't yet know well. I am writing as someone who knows CI/CD and is learning quantum computing alongside it. I am not a physicist; where I say something a physicist would wince at, that's the point where the exercise is teaching me something. I've left open questions in the margins on purpose.*
+*This is a constructed reference scenario for reasoning about an emerging operational problem. I'm using it to think through what it would take to wire an unfamiliar, expensive kind of workload into a delivery pipeline — by imagining a specific, realistic team and circuit rather than staying abstract. The reasoning, the mistakes, the fixes — all constructed for the exercise, grounded in real experience standing up CI/CD for technology a team doesn't yet know well. I am writing as someone who knows CI/CD and is learning quantum computing alongside it. I've left open questions in the margins on purpose.*
+
+The real subject is an ungoverned, opaque, money-spending activity that can be automated inside a CI/CD delivery pipeline. This paper seeks to relate concepts that should be shared between DevOps practitioners and quantum circuit engineers to make the most out of this new resource.
 
 ---
 
