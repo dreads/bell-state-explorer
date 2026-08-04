@@ -1,6 +1,8 @@
-# Circuit formats: viability research
+Bell State Explorer Design Details and Considerations
 
 _References to 'export' in this document refer to the ability of this code to provide the Bell circuit for downloading by the user. This document is unrelated to export regulations._
+
+# Circuit formats: viability research
 
 Can the app export a circuit that a person can actually run — on a local
 simulator, on someone else's simulator, or on real quantum hardware — and get
@@ -165,23 +167,3 @@ helper function still knows to do the reversal themselves. OpenQASM 2.0's own
 `creg c[2]` result ordering follows the same little-endian convention when
 read back by most tooling, so the same caveat applies to
 `export-templates/openqasm2.qasm`.
-
-## Recommended shape for the eventual IBM Cloud walkthrough doc
-
-Not built now — this is scoping for that later request, so it isn't
-forgotten:
-
-1. Set the app to a specific state (e.g. `θ=45°`, no rotation, Φ⁺) and screenshot/export its JSON (`src/export.js`) as the "ground truth" to compare against.
-2. Export the Qiskit template for that same state, run `statevector_report()` locally — show it matches the JSON export's density matrix.
-3. Run `sampled_report()` against `AerSimulator` — show shot noise around the same probabilities.
-4. Run `sampled_report()` against a real IBM backend via `qiskit-ibm-runtime` (the user has already done a basic Hadamard job, so the account/credential setup is presumably already solved) — compare *outcome probabilities only* against the app's diagonal, with the noise caveat above stated plainly.
-5. Optionally, as an advanced appendix: point at `qiskit-experiments` state tomography for readers who want the full ρ comparison, without making it a requirement of the main walkthrough.
-
-## Summary
-
-- Export the ideal unitary circuit (X, H, CNOT, Rᵧ⊗Rᵧ) only; dephasing has no gate equivalent and is called out in-file, not silently dropped.
-- Qiskit (Python) + OpenQASM 2.0 as a second, vendor-neutral target together cover "other IDEs/hardware" better than chasing individual vendor SDKs one at a time; the registry in `src/circuit-export.js` makes adding a third target cheap later. OpenQASM 2.0 over 3 because 3's import support proved inconsistent in practice (IBM Quantum Composer errored on it) — verified against the real tool, not assumed from the spec version.
-- Statevector-simulator comparison against the app is exact and directly useful.
-- Real-hardware comparison is valid **only for outcome probabilities** (the diagonal); the coherences require state tomography, which is out of scope for the shipped template.
-- Real device noise is not a stand-in for the `dephasing` slider — interesting to show side by side, wrong to present as equivalent.
-- Bit ordering must be reversed when comparing Qiskit/OpenQASM measurement output to this app's basis labels.

@@ -16,7 +16,7 @@ direct multiplication of the density matrix's off-diagonal entries by
 drop into this circuit to recreate it. Running this circuit on real hardware
 will show SOME decoherence from the device's own physical noise, but that
 number is not the app's dephasing value and the two should not be compared
-as if they were. See doc/quantum-format-research.md in the source repository
+as if they were. See doc/bell-state-explorer-design-details.md in the source repository
 (https://github.com/dreads/bell-state-explorer) for the full reasoning, and
 for what a fair simulator/hardware comparison does and doesn't require.
 
@@ -80,7 +80,7 @@ def sampled_report(qc, backend, label):
     """Adds measurement and runs on `backend` (a local simulator or a real
     device). Only the diagonal of the app's density matrix -- the outcome
     probabilities -- is comparable to this output; see the bit-order warning
-    above and doc/quantum-format-research.md for why the coherences are not
+    above and doc/bell-state-explorer-design-details.md for why the coherences are not
     recoverable from counts alone."""
     meas = qc.copy()
     meas.measure([0, 1], [0, 1])
@@ -113,5 +113,5 @@ if __name__ == "__main__":
     # Real hardware only returns measurement counts, never a density matrix.
     # Compare its outcome PROBABILITIES to the app's diagonal only; recovering
     # the coherences would require state tomography (see
-    # doc/quantum-format-research.md), which this template deliberately does
+    # doc/bell-state-explorer-design-details.md), which this template deliberately does
     # not attempt.

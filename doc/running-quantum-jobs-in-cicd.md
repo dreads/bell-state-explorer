@@ -36,6 +36,17 @@ Rather than force one format, the pipeline accepts three, and treats them as int
 
 A small loader resolves whichever of the three the scientist committed into the same in-memory circuit object, and *everything downstream depends only on that object.* The validation job, the nightly job, and the hardware-submission job never know or care which format was used. This is the same insulation principle as the Make boundary described below: the authoring format is the scientist's concern, not the pipeline's. All three formats need to produce a structurally identical circuit and — importantly — an identical thing to submit, so the choice of format genuinely doesn't change what runs.
 
+```mermaid
+flowchart LR
+    A[".qasm<br/>OpenQASM 2.0"] --> D["loader"]
+    B[".py<br/>Qiskit script"] --> D
+    C[".ipynb<br/>tagged cell only"] --> D
+    D --> E["one QuantumCircuit object"]
+    E --> F["branch validation"]
+    E --> G["nightly check"]
+    E --> H["hardware submission"]
+```
+
 One deliberate detail on the notebook path, because it has a sharp edge. Accepting a `.py` or `.ipynb` means the pipeline runs code the scientist wrote. For the notebook, that's resolved by executing *only* the single cell tagged as the circuit, never the whole notebook — so exploratory cells, half-finished experiments, and stray imports never run in CI. That this is safe at all rests on the accountability model in Part 5: the payload lives in the repo under signed commits and review, so "we run their code" is bounded by "their code is named, attributable, and reviewed before it can run."
 
 So the branch-validation job does **not** touch a real quantum processor. It does three cheaper things:
@@ -80,6 +91,22 @@ The practical consequence for the pipeline is clarifying, and it changes where t
 - **The persistent handles on IBM's side are the instance and the job ID.** Not a program. The instance (a cloud resource name) is the execution context the credentials point at; each submission produces a job ID that persists as the record of that run. Those are the durable cloud-side things, and they're what the accountability trail in Part 5 hangs on.
 
 The circuit is the artifact; the repo is where it lives; the job ID is the receipt.
+
+```mermaid
+sequenceDiagram
+    participant Repo as repo (.qasm/.py/.ipynb)
+    participant Loader as loader
+    participant IBM as IBM cloud Transpiler Service
+    participant Sampler as SamplerV2 primitive
+    participant Job as job ID
+
+    Repo->>Loader: resolve payload to QuantumCircuit
+    Loader->>IBM: convert to target backend's ISA
+    IBM-->>Loader: ISA circuit
+    Loader->>Sampler: submit ISA circuit as a PUB
+    Sampler-->>Job: job ID issued
+    Note over Repo,Job: the .ipynb/.py/.qasm file itself never leaves the repo
+```
 
 **Who does the conversion, and where, turned into its own small decision.** The obvious approach is to convert every circuit the same way, everywhere, with Qiskit's own local pass manager — it's free, fast, and already what the branch check needs for its own cheap sanity pass. But the real hardware submission is different in one respect: it's the step where the exact ISA circuit that lands on a physical device matters down to the gate. Handing that specific conversion to IBM's own cloud-hosted Qiskit Transpiler Service, rather than a local pass manager, means the ISA circuit that actually runs was produced by the same system that's about to execute it — not a local approximation of what that backend expects, built by pipeline code with its own possibly-stale assumptions. So the real-hardware path calls out to IBM's cloud transpiler; the branch check and the nightly noise-model check keep using a local pass manager, because neither of those touches a real device end-to-end and both need to run fast and, in the branch check's case, without any credentials at all — a cloud call has no place there.
 
@@ -186,6 +213,24 @@ Second: the counts are almost perfectly uniform — roughly a quarter each acros
 
 Third, and this is the part worth sitting with: **the failure is surfaced by connecting and pulling calibration, not by running on the quantum computer.** It costs essentially nothing in hardware time. The device's bad state is learned without spending a cent of quota to find out.
 
+```mermaid
+sequenceDiagram
+    participant CI as nightly job
+    participant IBM as IBM Cloud
+    participant Aer as local Aer simulator
+
+    CI->>IBM: authenticate + list jobs (connectivity check)
+    IBM-->>CI: connection OK, 1 recent job visible
+    CI->>IBM: pull ibm_marrakesh calibration
+    IBM-->>CI: live calibration data
+    CI->>Aer: build noise model from calibration
+    CI->>Aer: simulate Bell circuit
+    Aer-->>CI: counts ≈ uniform across 00/01/10/11
+    Note over CI: p(00)+p(11) = 0.4954 vs threshold 0.9 -- FAIL
+```
+
+No step in that chain touches the physical processor — the whole failure is diagnosed from calibration data and a local simulation.
+
 ### Why it happens — the maintenance window
 
 The cause, once dug into, is mundane and specific: **the device is mid-recalibration.** Heron-generation processors go through calibration cycles, and for a window afterward the device is stabilizing. The freshly-pulled calibration during that window is degraded enough that even the *simulated* correlation — the model built from those numbers — collapses to noise. The nightly cron had been scheduled squarely inside that window.
@@ -233,6 +278,12 @@ Concretely, on IBM Cloud, the relevant machinery is real and quantum-aware:
 - **Access groups** scope *which service instances* a given identity can reach, and quantum actions are first-class IAM actions — an administrator can write policy around actions like `quantum-computing.job.delete`. So "which identity may submit or delete a quantum job, on which instance" is enforced by IBM, as policy, not by pipeline application logic.
 - **Activity Tracker** captures audit records for API calls made against IBM Cloud resources, in the standardized Cloud Auditing Data Federation (CADF) format. This is the provider-side, out-of-your-control trail: it records that a specific Service ID submitted a specific job at a specific time against a specific instance, regardless of what CI logs say — in a standard schema, not a proprietary one.
 
+This isn't hypothetical machinery — it's what the IBM Cloud console actually shows once `dev` and `prod` each have their own Service ID, scoped by their own access group:
+
+![Two access groups — one letting dev collaborators gather simulator configuration, one letting prod collaborators send workloads to real QPU time](access_groups.png)
+
+![Two Service IDs, one scoped to dev pipeline credentials and one to prod, each with their own API key](svc_ids.png)
+
 Now put the three together for the bad-day scenario. A job went out that shouldn't have. The story isn't "hoping GitHub's logs are intact." It's:
 
 - The **signed commit** shows author A wrote (or altered) the circuit.
@@ -240,6 +291,24 @@ Now put the three together for the bad-day scenario. A job went out that shouldn
 - **IBM's Activity Tracker** shows Service-ID-prod submitted job X at time Y against instance Z.
 
 Three independent systems, three identities, one correlatable trail. Any two of them can be cross-checked against the third. Collapse any two — one shared token, or approval and submission under the same identity — and the ability to cross-check is gone, which is the entire value.
+
+```mermaid
+flowchart LR
+    subgraph Git["Git -- your repo"]
+        A["signed commit<br/>author A wrote/changed the circuit"]
+    end
+    subgraph GH["GitHub environment log -- org control"]
+        B["required-reviewer record<br/>reviewer R approved the merge"]
+    end
+    subgraph IBM["IBM Activity Tracker -- provider control"]
+        C["Service-ID-prod submitted<br/>job X at time Y against instance Z"]
+    end
+    A <-. cross-check .-> B
+    B <-. cross-check .-> C
+    A <-. cross-check .-> C
+```
+
+No solid line connects the three boxes on purpose — nothing in one system depends on or feeds the others. That absence of a direct link is what makes the dotted cross-checks meaningful; collapse any two identities into one and there is nothing left to check.
 
 **This is also the real reason for two credential pairs.** Distinct Service IDs per environment mean the *provider-side* audit trail can distinguish "this ran under the gated prod identity" from "this ran under the ungated dev identity" **without trusting GitHub at all.** The identity boundary is enforced at IBM, mirrored at GitHub, and the two have to agree with each other. Two differently-named secrets sharing one underlying identity would look fine in GitHub and be invisible in IBM's trail — exactly the collapse worth avoiding. The two pairs aren't about spend limits; they're about keeping the accountability trail legible on the side you don't control.
 
