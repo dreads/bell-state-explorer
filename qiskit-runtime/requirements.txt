@@ -1,4 +1,8 @@
-qiskit>=2.5
+# qiskit 2.5.0 dropped the private qiskit.synthesis.linear.linear_matrix_utils
+# module that qiskit-ibm-transpiler's TranspilerService import chain still
+# needs, breaking run.py's real hardware submission. Capped below 2.5 until
+# an upstream qiskit-ibm-transpiler release is confirmed compatible.
+qiskit>=2.3.0,<2.5.0
 qiskit-aer>=0.17
 qiskit-ibm-runtime>=0.48
-qiskit-ibm-transpiler>=0.13
+qiskit-ibm-transpiler>=0.13,<0.19
