@@ -1,5 +1,6 @@
 # Bell state density matrix explorer
 
+
 An interactive visualisation of the two-qubit density matrix for Bell states,
 with controls for dephasing, amplitude balance, and local single-qubit rotation.
 
