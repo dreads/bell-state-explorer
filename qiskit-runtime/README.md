@@ -91,6 +91,14 @@ ungated-dev one, independent of anything GitHub's logs say. See
   (Quantum Platform dashboard -> Instances tab) as `QC_INSTANCE`.
 - Prefer narrowly-scoped, rotatable, limited-use keys.
 
+What this looks like once both environments are set up — an access group per environment, scoping what each one is allowed to do:
+
+![Two access groups — one letting dev collaborators gather simulator configuration, one letting prod collaborators send workloads to real QPU time](../doc/access_groups.png)
+
+...and a Service ID per environment, each with its own scoped API key:
+
+![Two Service IDs, one scoped to dev pipeline credentials and one to prod, each with their own API key](../doc/svc_ids.png)
+
 ### 3. Require CODEOWNERS review on circuit/pipeline paths
 
 `.github/CODEOWNERS` already scopes `qiskit-runtime/circuits/**` and

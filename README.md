@@ -387,7 +387,7 @@ The full reasoning behind these decisions — what a fair simulator/hardware
 comparison actually requires (spoiler: state tomography for the coherences,
 not just measurement counts), which formats other vendors' toolchains
 accept, and a recommended shape for writing up a real run — is in
-[`doc/quantum-export-research.md`](doc/quantum-format-research.md).
+[`doc/quantum-export-research.md`](doc/bell-state-explorer-design-details.md).
 
 **Maintaining this**: `test/circuit-export.test.js` covers placeholder
 values, template rendering, and the fetch-based loader.
