@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+
+title: >-
+
+  Running Quantum Jobs Through CI/CD: Bridging DevOps and Quantum
+  Engineering Around an Under-Governed, Expensive, Opaque Workload
+message: "If you use or reference this work, please cite it as below."
+
+type: article
+authors:
+  - given-names: Roderick
+    family-names: Bowser
+    orcid: "https://orcid.org/0009-0008-5634-1206"   # register free at orcid.org
+
+repository-code: "https://github.com/dreads/bell-state-explorer"
+url: "https://github.com/dreads/bell-state-explorer/blob/main/doc/running-quantum-jobs-in-cicd.md"
+
+keywords:
+  - quantum computing
+  - CI/CD
+  - DevSecOps
+  - IBM Quantum
+  - Qiskit
+  - governance
+  - audit trail
+license: Code in this repository is licensed under the MIT License. The whitepaper (doc/running-quantum-jobs-in-cicd.md) is licensed under CC-BY-4.0.
+
+date-released: 2026-08-04
