@@ -600,4 +600,4 @@ Some directions the current structure supports:
 
 ## License
 
-MIT
+Code in this repository is licensed under the MIT License. The whitepaper (doc/running-quantum-jobs-in-cicd.md) is licensed under CC-BY-4.0.
