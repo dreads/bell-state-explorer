@@ -1,20 +1,14 @@
 cff-version: 1.2.0
-
-title: >-
-
-  Running Quantum Jobs Through CI/CD: Bridging DevOps and Quantum
-  Engineering Around an Under-Governed, Expensive, Opaque Workload
-message: "If you use or reference this work, please cite it as below."
-
-type: article
+message: "If you use this software, please cite it as below. To cite the accompanying whitepaper, see the preferred-citation entry."
+type: software
+title: "Bell state density matrix explorer"
+abstract: "Interactive visualisation of the two-qubit density matrix for Bell states."
 authors:
   - given-names: Roderick
     family-names: Bowser
-    orcid: "https://orcid.org/0009-0008-5634-1206"   # register free at orcid.org
-
+    orcid: "https://orcid.org/0009-0008-5634-1206"
 repository-code: "https://github.com/dreads/bell-state-explorer"
-url: "https://github.com/dreads/bell-state-explorer/blob/main/doc/running-quantum-jobs-in-cicd.md"
-
+license: MIT
 keywords:
   - quantum computing
   - CI/CD
@@ -23,6 +17,14 @@ keywords:
   - Qiskit
   - governance
   - audit trail
-license: Code in this repository is licensed under the MIT License. The whitepaper (doc/running-quantum-jobs-in-cicd.md) is licensed under CC-BY-4.0.
-
 date-released: 2026-08-04
+preferred-citation:
+  type: article
+  title: "Governing Quantum Job Submission in CI/CD Pipelines: An Accountability Model"
+  authors:
+    - given-names: Roderick
+      family-names: Bowser
+      orcid: "https://orcid.org/0009-0008-5634-1206"
+  url: "https://github.com/dreads/bell-state-explorer/blob/main/doc/running-quantum-jobs-in-cicd.md"
+  license: CC-BY-4.0
+  year: 2026

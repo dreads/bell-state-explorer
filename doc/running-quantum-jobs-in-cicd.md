@@ -1,3 +1,19 @@
+# Governing Quantum Job Submission in CI/CD Pipelines: An Accountability Model
+
+# Abstract
+
+Most discussion of "quantum" and "security" concerns the cryptographic threat — a future cryptographically-relevant quantum computer breaking public-key encryption, and the migration to post-quantum cryptography. This document examines a nearer, more mundane, and largely undiscussed problem: the delivery pipeline that submits quantum jobs to cloud hardware is an ordinary CI/CD attack surface with an unusual property — it spends real money executing a workload that no human approver can read.
+
+The real subject is an ungoverned, opaque, money-spending activity that can be automated inside a CI/CD delivery pipeline, and the account is written to connect concepts that DevOps practitioners and quantum circuit engineers each half-understand but rarely share. It is framed as a constructed reference scenario — a CI/CD practitioner wiring an opaque quantum circuit (a two-qubit Bell state, standing in for "some quantum workload the team does not understand") into a GitHub Actions pipeline and IBM Quantum — deliberately taken from the perspective of a newcomer to the quantum side. The problem is reasoned through in the order it plausibly unfolds: branch validation without real hardware; job submission on merge; a configuration model that separates execution target (simulator vs. hardware) from spend authority (credentials and approval); a scheduled nightly run; and an accountability model for the day an approval is fumbled.
+
+Several findings emerge. Circuit validation requires no quantum hardware: structural checks plus local noise-model simulation, reduced to a single gateable scalar, catch the failures that matter. The contemporary IBM execution model submits a device-specific ISA circuit rather than uploading a persistent server-side program, which relocates the durable artifact into version control. A scheduled job built to reduce cost doubles as a zero-quota device-health sensor, since connecting and pulling calibration data measures device noise without executing on hardware. Most substantively, the document proposes a **three-identity accountability model** — author (signed Git commit), approver (GitHub environment record plus a checked-in CODEOWNERS gate), and submitter (a scoped IBM Cloud IAM Service ID, recorded independently in Activity Tracker) — held in three independent systems that must not be collapsed into one, so that the audit trail survives on infrastructure outside any single team's control.
+
+The document is explicit about its limits and leaves open questions in the margins throughout. It argues that the CI/CD governance exposure of quantum submission pipelines is a present-day operational concern for any engineering organization that could be handed this task, and that it is worth naming before these pipelines are ubiquitous rather than after the first expensive mistake.
+
+# Keywords
+
+quantum computing, CI/CD, DevSecOps, IBM Quantum, Qiskit, software supply chain, governance, accountability, audit trail, identity and access management, GitHub Actions, platform engineering
+
 # Running quantum jobs through CI/CD, as a newcomer
 
 *This is a constructed reference scenario for reasoning about an emerging operational problem. I'm using it to think through what it would take to wire an unfamiliar, expensive kind of workload into a delivery pipeline — by imagining a specific, realistic team and circuit rather than staying abstract. The reasoning, the mistakes, the fixes — all constructed for the exercise, grounded in real experience standing up CI/CD for technology a team doesn't yet know well. I am writing as someone who knows CI/CD and is learning quantum computing alongside it. I've left open questions in the margins on purpose.*
