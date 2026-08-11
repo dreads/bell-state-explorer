@@ -601,3 +601,5 @@ From README — areas where the codebase is designed to grow:
 
 - Never use the phrase "full stop" in prose (docs, PRs, commit messages,
   chat) — rephrase or just end the sentence with a period.
+- Avoid use of "sharp edge" in prose to describe risk (docs, PRs, commit messages,
+  chat). 
