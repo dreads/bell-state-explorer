@@ -2,13 +2,13 @@
 
 # Abstract
 
-Most discussion of "quantum" and "security" concerns the cryptographic threat — a future cryptographically-relevant quantum computer breaking public-key encryption, and the migration to post-quantum cryptography. This document examines a nearer, more mundane, and largely undiscussed problem: the delivery pipeline that submits quantum jobs to cloud hardware is an ordinary CI/CD attack surface with an unusual property — it spends real money executing a workload that no human approver can read.
+Most discussion of "quantum" and "security" concerns the cryptographic threat — a future cryptographically-relevant quantum computer breaking public-key encryption, and the migration to post-quantum cryptography. This document examines a largely undiscussed problem: the conventional to quantum compute interface is an ordinary CI/CD attack surface that spends real money executing workloads obfuscated from human reviewers. When automated, a bad implementation pattern can become a wasteful, hidden, recurring cost center.
 
-The real subject is an ungoverned, opaque, money-spending activity that can be automated inside a CI/CD delivery pipeline, and the account is written to connect concepts that DevOps practitioners and quantum circuit engineers each half-understand but rarely share. It is framed as a constructed reference scenario — a CI/CD practitioner wiring an opaque quantum circuit (a two-qubit Bell state, standing in for "some quantum workload the team does not understand") into a GitHub Actions pipeline and IBM Quantum — deliberately taken from the perspective of a newcomer to the quantum side. The problem is reasoned through in the order it plausibly unfolds: branch validation without real hardware; job submission on merge; a configuration model that separates execution target (simulator vs. hardware) from spend authority (credentials and approval); a scheduled nightly run; and an accountability model for the day an approval is fumbled.
+The account is written to connect concepts framed as a constructed reference scenario — a CI/CD practitioner wiring an opaque quantum circuit into a GitHub Actions pipeline and IBM Quantum. The problem is reasoned through in the order it plausibly unfolds: branch validation without real hardware; job submission on merge; a configuration model that separates execution target from spend authority ; a scheduled nightly run; and an accountability model for the day an approval is fumbled.
 
-Several findings emerge. Circuit validation requires no quantum hardware: structural checks plus local noise-model simulation, reduced to a single gateable scalar, catch the failures that matter. The contemporary IBM execution model submits a device-specific ISA circuit rather than uploading a persistent server-side program, which relocates the durable artifact into version control. A scheduled job built to reduce cost doubles as a zero-quota device-health sensor, since connecting and pulling calibration data measures device noise without executing on hardware. Most substantively, the document proposes a **three-identity accountability model** — author (signed Git commit), approver (GitHub environment record plus a checked-in CODEOWNERS gate), and submitter (a scoped IBM Cloud IAM Service ID, recorded independently in Activity Tracker) — held in three independent systems that must not be collapsed into one, so that the audit trail survives on infrastructure outside any single team's control.
+Several findings emerge. Circuit validation requires no quantum hardware: structural checks plus local noise-model simulation, reduced to a single gateable scalar, catch the failures that matter. The contemporary execution model submits a device-specific ISA circuit rather than uploading a persistent server-side program, which relocates the durable artifact into version control. A scheduled job built to reduce cost doubles as a zero-quota device-health sensor, measuring device noise without executing on hardware. Most substantively, the document proposes a **three-identity accountability model** — author, approver, and submitter — held in three independent systems so that the audit trail survives on infrastructure outside any single team's control.
 
-The document is explicit about its limits and leaves open questions in the margins throughout. It argues that the CI/CD governance exposure of quantum submission pipelines is a present-day operational concern for any engineering organization that could be handed this task, and that it is worth naming before these pipelines are ubiquitous rather than after the first expensive mistake.
+The document is explicit about its limits and leaves open questions in the margins throughout. It argues that the CI/CD governance exposure of quantum submission pipelines is a present-day operational concern worth naming.
 
 # Keywords
 
@@ -16,23 +16,21 @@ quantum computing, CI/CD, DevSecOps, IBM Quantum, Qiskit, software supply chain,
 
 # Running quantum jobs through CI/CD, as a newcomer
 
-*This is a constructed reference scenario for reasoning about an emerging operational problem. I'm using it to think through what it would take to wire an unfamiliar, expensive kind of workload into a delivery pipeline — by imagining a specific, realistic team and circuit rather than staying abstract. The reasoning, the mistakes, the fixes — all constructed for the exercise, grounded in real experience standing up CI/CD for technology a team doesn't yet know well. I am writing as someone who knows CI/CD and is learning quantum computing alongside it. I've left open questions in the margins on purpose.*
+*This is a constructed reference scenario for reasoning about the emerging operational problem of wiring an unfamiliar, expensive workload into a delivery pipeline. The reasoning, the mistakes, the fixes — all constructed for the exercise, grounded in real experience standing up CI/CD for technology. I am writing as someone who knows CI/CD and is learning quantum computing alongside it. I've left open questions in the margins on purpose.*
 
-The real subject is an ungoverned, opaque, money-spending activity that can be automated inside a CI/CD delivery pipeline. This paper seeks to relate concepts that should be shared between DevOps practitioners and quantum circuit engineers to make the most out of this new resource.
+The real subject is an ungoverned, opaque, money-spending activity when automated inside a CI/CD delivery pipeline. This paper seeks to relate concepts that should be shared between DevOps practitioners and quantum circuit engineers to make the most out of this new resource.
 
 ---
 
 ## The situation
 
-A data scientist on the team has written a quantum circuit. They want it run on real quantum hardware. Nobody else on the team knows much about quantum computing. The team trusts the person who wrote it — mostly, in the way you trust a colleague whose work you cannot personally check.
+A data scientist on the team has written a quantum circuit. They want it run on real quantum hardware. The business has signed off and your team has received access to quantum computing resources, including user IDs. Nobody else on the team knows much about quantum computing.  
 
 What the team *does* know is CI/CD. GitHub Actions, branches, pull requests, reviews, merges, secrets, cron. So the question worth working through is narrow and practical: **how do you take an opaque circuit from a colleague and get it onto a quantum computer safely, using the delivery machinery you already trust for everything else?**
 
-This walks through that scenario roughly in the order it would plausibly unfold. It's deliberately a beginner's account. The circuit itself — a Bell state, two qubits, a Hadamard and a CNOT — is almost the simplest interesting thing you can run, and that's the point. The circuit is a placeholder for "some quantum thing the team doesn't understand." The interesting part is the pipeline around it.
+This walks through that scenario roughly in the order it would plausibly unfold. It's deliberately a beginner's account. The circuit included in this repository is a placeholder for "some quantum thing the team doesn't understand." To a DevOps team seeking to apply governance, the interesting part is the pipeline we build around it.
 
-The scientist checks a circuit into a branch. The team wants it validated. When the branch is approved and merged, they want the job to run. Later they discover that running during business hours costs too much, so they add a nightly job. Simple to state. Each step surfaces something worth learning.
-
-> **A note on what "we trust him, kinda" really means.** That phrase carries more weight than it first suggests. It doesn't mean "run whatever he writes." It means the trust has to be *named and attributable* rather than ambient — every circuit change, every approval, every submission tied to a specific identity in a durable record. Most of the second half of this document is about that.
+The scientist checks the circuit into a branch. The team wants it validated. When the branch is approved and merged, they want the job to run. Later they discover that running during business hours costs too much, so they add a nightly job. Each step surfaces something worth learning.
 
 ---
 
@@ -40,19 +38,19 @@ The scientist checks a circuit into a branch. The team wants it validated. When 
 
 The first job is the one everyone reaches for: run something on every push to a branch so a bad change gets caught before review. In normal software this is a test suite. What's the equivalent for a quantum circuit?
 
-The obvious first instinct is wrong. "Validate the circuit" doesn't mean "run it on the quantum computer and check the answer." That's expensive, slow, and usually unnecessary for catching the things that actually break. You don't need real hardware to catch a malformed circuit or a circuit that's drifted from what it's supposed to compute.
+ It's expensive to use real quantum hardware to catch a malformed circuit or a circuit that's drifted from what it's supposed to compute. While quantum compute times are very fast, every shot (an execution of the circuit) costs money and workload queue times can be lengthy. We can provide a sufficiently high level of confidence by performing validation within the pipeline during the continuous integration phase.
 
 ### What the scientist actually checks in
 
-Before validation itself, there's a decision about what the payload even *is* — what file the scientist commits to the branch. This matters more than it might seem, because people who write circuits don't all work the same way. Some think in Qiskit and want to write Python. Some have an OpenQASM file exported from somewhere else. Some live in a notebook and would rather hand over that.
+Before validation itself, there's a decision about what the payload even *is* — what file the scientist commits to the branch. 
 
-Rather than force one format, the pipeline accepts three, and treats them as interchangeable:
+For interoperability and demonstration, the pipeline here accepts three, treating them as interchangeable:
 
 - **An OpenQASM 2.0 file** (`.qasm`) — the circuit as portable assembly-like source.
 - **A Qiskit source file** (`.py`) — a small module exposing a function that returns the circuit.
 - **A Jupyter notebook** (`.ipynb`) — with one code cell tagged as the circuit; the rest of the notebook is scratch and is ignored.
 
-A small loader resolves whichever of the three the scientist committed into the same in-memory circuit object, and *everything downstream depends only on that object.* The validation job, the nightly job, and the hardware-submission job never know or care which format was used. This is the same insulation principle as the Make boundary described below: the authoring format is the scientist's concern, not the pipeline's. All three formats need to produce a structurally identical circuit and — importantly — an identical thing to submit, so the choice of format genuinely doesn't change what runs.
+A small loader resolves whichever of the three the scientist committed into an in-memory circuit object, and the validation job, the nightly job, and the hardware-submission job depend only on that object. A structurally identical circuit is created from any of the three formats.
 
 ```mermaid
 flowchart LR
@@ -65,28 +63,24 @@ flowchart LR
     E --> H["hardware submission"]
 ```
 
-One deliberate detail on the notebook path, because it has a sharp edge. Accepting a `.py` or `.ipynb` means the pipeline runs code the scientist wrote. For the notebook, that's resolved by executing *only* the single cell tagged as the circuit, never the whole notebook — so exploratory cells, half-finished experiments, and stray imports never run in CI. That this is safe at all rests on the accountability model in Part 5: the payload lives in the repo under signed commits and review, so "we run their code" is bounded by "their code is named, attributable, and reviewed before it can run."
+If the circuit has a `.py` extension, the pipeline just runs code the scientist wrote. For the notebook (`.ipynb`), that's resolved by executing *only* the single cell tagged as the circuit, never the whole notebook. The standard way to do this is ensuring the metadata.tags list contains "circuit" for the cell to be executed. Exploratory cells, half-finished experiments, and stray imports never run in CI. 
 
-So the branch-validation job does **not** touch a real quantum processor. It does three cheaper things:
+So the branch-validation job does **not** touch a real quantum processor. It does three cheaper things that provide direct value:
 
-1. **Structural checks.** Does the circuit build? Does it transpile at all, against a generic local target — not a specific real device, just a cheap sanity check that it doesn't use something no simulator or hardware could ever execute? A malformed payload — broken OpenQASM, a notebook with no tagged circuit cell, a circuit with no measurements — fails here, early and cleanly, before anything expensive.
-2. **Local simulation.** Run the circuit on a local statevector or noise-model simulator and check the output distribution is what's expected. For a Bell state, the expected result is roughly half `00` and half `11`, with essentially no `01` or `10`. That correlation is the fingerprint of the circuit doing its job.
-3. **A correlation assertion.** Reduce the whole thing to one pass/fail number. For a Bell circuit, `p(00) + p(11)` compared against a threshold. A healthy Bell state pushes that number toward 1.0. A broken circuit — or a noisy simulation — collapses it toward 0.5, which is what four equally likely outcomes look like: no entanglement signal at all.
-
-That last number turns out to be the single most useful thing in the whole pipeline. More on that in Part 4.
+1. **Structural checks.** Does the circuit build? Transpilation against a generic local target — not a specific real device, provides a cheap sanity check. A malformed payload — broken OpenQASM, a notebook with no tagged circuit cell, a circuit with no measurements — fails here, early and cleanly, before anything expensive.
+2. **Local simulation.** Run the circuit on a local statevector or noise-model simulator and check the output distribution is what's expected. For the Bell state circuit in this repository, the expected result is roughly half `00` and half `11`, with essentially no `01` or `10`. That correlation is the fingerprint of the circuit doing its job.
+3. **A correlation assertion.** Reduce the whole thing to one pass/fail number. For a Bell circuit, this is `p(00) + p(11)` compared against a threshold. A healthy Bell state pushes that number toward 1.0. A broken circuit — or a noisy simulation — collapses it toward 0.5, which is what four equally likely outcomes look like: no entanglement signal at all.
 
 ### The DevOps concern: understanding the physics shouldn't be a prerequisite for running the pipeline
 
-A real constraint shows up immediately. The scientist's code is driven by a `Makefile` — already there, not something to rewrite just because Make isn't to taste. But the CI configuration shouldn't depend on the internals of that Makefile either. The moment the workflow YAML has to know *how* the circuit is built, the delivery pipeline is coupled to physics code nobody on the DevOps side can maintain.
+A real constraint shows up immediately. The scientist's code is driven by a `Makefile`, but the CI configuration shouldn't depend on the internals of that Makefile. The moment the workflow YAML has to know *how* the circuit is built, the delivery pipeline is coupled to physics code nobody on the DevOps side can maintain.
 
-So draw a hard line — a contract — between the two roles:
+This implementation creates a contract between the two roles:
 
-- **The DevOps side passes inputs in.** Backend name, threshold, shot count, instance, channel, and execution mode go in as environment variables and workflow inputs. Nothing else.
-- **The quantum side (the scientist's code, behind Make) passes one clean signal out.** An exit code for pass/fail, plus a machine-readable result file — a small JSON blob with the measured numbers — written to a known path. The workflow reads *that*, not scraped log text.
+- **The DevOps side passes inputs in.** Backend name, threshold, shot count, instance, channel, and execution mode go in as environment variables and workflow inputs. 
+- **The quantum side (the scientist's code, behind Make) passes one clean signal out.** An exit code for pass/fail, plus a machine-readable result file written to a known path. The workflow reads a small JSON blob with the measured numbers, not scraped log text.
 
-If the existing implementation can't honor that contract, the implementation changes to fit the contract, rather than letting Make's shape leak into the workflow. The person writing CI never edits a Makefile, and the person writing circuits never edits YAML. That boundary holds up through everything that follows, and it's arguably the most important early decision.
-
-> **Margin question.** Is a single scalar (`p(00) + p(11)`) too crude a gate for circuits more complex than a Bell state? For richer circuits the natural next step is probably asserting against expectation values of specific observables instead. Worth understanding how people gate correctness for circuits where "the expected distribution" isn't obvious by inspection.
+The person writing CI should not need to edit the Makefile, and the person writing circuits never edits YAML. That boundary is enforced through subsequent workflow actions.
 
 ---
 
@@ -94,15 +88,13 @@ If the existing implementation can't honor that contract, the implementation cha
 
 When the branch is approved and merged to `main`, the scientist wants the job to actually run — on real quantum hardware this time. This is the heart of the whole exercise, because this is the step where an opaque circuit, written by someone whose work can't be checked, executes against a paid resource on infrastructure the team doesn't own.
 
-This is the part that deserves the most discomfort, and where the interesting governance questions live.
+The interesting governance questions live where there is external compute expense.
 
 ### What actually gets submitted (and what does not)
 
-A wrong mental model is easy to bring to this. It's tempting to assume "running the job on hardware" means *uploading* the circuit — the notebook, or the script — to IBM, where it lives as some named program invocable by ID. That's not how it works, and it used to be closer to how it worked, which is exactly why the confusion is easy.
+ You take your circuit, convert it locally to the target device's instruction set, and submit *the converted circuit itself* to one of IBM's predefined execution primitives. There's no persistent server-side program living in the cloud.
 
-IBM did once have a model where you uploaded a program, got back a program ID, and invoked it later by that ID. That model is deprecated and gone; it was also never generally available, gated to certain plan tiers. It's been replaced by a different approach: you don't upload a program at all. You take your circuit, convert it locally to the target device's instruction set, and submit *the converted circuit itself* to one of IBM's predefined execution primitives. There's no persistent server-side program living in the cloud.
-
-The practical consequence for the pipeline is clarifying, and it changes where the "program" is understood to live:
+The practical consequence for the pipeline changes where the "program" is understood to live:
 
 - **The payload file is a repository artifact, not a cloud upload.** The `.qasm`/`.py`/`.ipynb` the scientist committed never goes to IBM. It lives in Git, under version control and review. That file *is* the durable program — and it's more durable than a program ID would be, since a program ID can be deprecated out from under you, which is precisely what happened to the old model.
 - **What crosses the wire is the ISA circuit** — the circuit converted to the specific device's native instruction set. The notebook is an authoring format; the ISA circuit is the wire format.
@@ -126,7 +118,7 @@ sequenceDiagram
     Note over Repo,Job: the .ipynb/.py/.qasm file itself never leaves the repo
 ```
 
-**Who does the conversion, and where, turned into its own small decision.** The obvious approach is to convert every circuit the same way, everywhere, with Qiskit's own local pass manager — it's free, fast, and already what the branch check needs for its own cheap sanity pass. But the real hardware submission is different in one respect: it's the step where the exact ISA circuit that lands on a physical device matters down to the gate. Handing that specific conversion to IBM's own cloud-hosted Qiskit Transpiler Service, rather than a local pass manager, means the ISA circuit that actually runs was produced by the same system that's about to execute it — not a local approximation of what that backend expects, built by pipeline code with its own possibly-stale assumptions. So the real-hardware path calls out to IBM's cloud transpiler; the branch check and the nightly noise-model check keep using a local pass manager, because neither of those touches a real device end-to-end and both need to run fast and, in the branch check's case, without any credentials at all — a cloud call has no place there.
+The obvious approach is to convert every circuit the same way, everywhere, with Qiskit's own local pass manager — it's free, fast, and already what the branch check needs for its own cheap sanity pass. But the real hardware submission is different in one respect: it's the step where the exact ISA circuit that lands on a physical device matters down to the gate. Handing that specific conversion to IBM's own cloud-hosted Qiskit Transpiler Service, rather than a local pass manager, means the ISA circuit that actually runs was produced by the same system that's about to execute it — not a local approximation of what that backend expects, built by pipeline code with its own possibly-stale assumptions. So the real-hardware path calls out to IBM's cloud transpiler; the branch check and the nightly noise-model check keep using a local pass manager, because neither of those touches a real device end-to-end and both need to run fast and, in the branch check's case, without any credentials at all — a cloud call has no place there.
 
 ### Blocking first, because it is simpler and correct
 
