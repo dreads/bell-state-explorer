@@ -84,11 +84,11 @@ The person writing CI should not need to edit the Makefile, and the person writi
 
 ---
 
-## Part 2 — Run the job on merge (this is the part that spends money)
+## Part 2 — Run the job on merge (the part that spends money)
 
 When the branch is approved and merged to `main`, the scientist wants the job to actually run — on real quantum hardware this time. This is the heart of the whole exercise, because this is the step where an opaque circuit, written by someone whose work can't be checked, executes against a paid resource on infrastructure the team doesn't own.
 
-The interesting governance questions live where there is external compute expense.
+The interesting governance questions live where there is external compute cost.
 
 ### What actually gets submitted (and what does not)
 
@@ -96,11 +96,9 @@ The interesting governance questions live where there is external compute expens
 
 The practical consequence for the pipeline changes where the "program" is understood to live:
 
-- **The payload file is a repository artifact, not a cloud upload.** The `.qasm`/`.py`/`.ipynb` the scientist committed never goes to IBM. It lives in Git, under version control and review. That file *is* the durable program — and it's more durable than a program ID would be, since a program ID can be deprecated out from under you, which is precisely what happened to the old model.
-- **What crosses the wire is the ISA circuit** — the circuit converted to the specific device's native instruction set. The notebook is an authoring format; the ISA circuit is the wire format.
-- **The persistent handles on IBM's side are the instance and the job ID.** Not a program. The instance (a cloud resource name) is the execution context the credentials point at; each submission produces a job ID that persists as the record of that run. Those are the durable cloud-side things, and they're what the accountability trail in Part 5 hangs on.
-
-The circuit is the artifact; the repo is where it lives; the job ID is the receipt.
+- **The authoring format file (`.qasm`/`.py`/`.ipynb`) the scientist committed never goes to IBM.** It lives in Git, under version control and review. 
+- **What crosses the wire is the ISA circuit** — the circuit converted to the specific device's native instruction set. The ISA circuit is the wire format.
+- **The persistent handles on IBM's side are the instance and the job ID.** The instance (a cloud resource name) is the execution context the credentials point at; each submission produces a job ID that persists as the record of that run. 
 
 ```mermaid
 sequenceDiagram
@@ -118,41 +116,30 @@ sequenceDiagram
     Note over Repo,Job: the .ipynb/.py/.qasm file itself never leaves the repo
 ```
 
-The obvious approach is to convert every circuit the same way, everywhere, with Qiskit's own local pass manager — it's free, fast, and already what the branch check needs for its own cheap sanity pass. But the real hardware submission is different in one respect: it's the step where the exact ISA circuit that lands on a physical device matters down to the gate. Handing that specific conversion to IBM's own cloud-hosted Qiskit Transpiler Service, rather than a local pass manager, means the ISA circuit that actually runs was produced by the same system that's about to execute it — not a local approximation of what that backend expects, built by pipeline code with its own possibly-stale assumptions. So the real-hardware path calls out to IBM's cloud transpiler; the branch check and the nightly noise-model check keep using a local pass manager, because neither of those touches a real device end-to-end and both need to run fast and, in the branch check's case, without any credentials at all — a cloud call has no place there.
+During real hardware submission, the exact ISA circuit matters down to the gate, so we hand that specific conversion to IBM's own cloud-hosted Qiskit Transpiler Service, rather than a local pass manager. This means the ISA circuit that actually runs was produced by the same system that's about to execute it — not a local approximation of what that backend expects.
 
 ### Blocking first, because it is simpler and correct
 
 There are two broad ways to run a job that takes real wall-clock time in CI:
 
-- **Blocking (synchronous):** submit the job, then hold the workflow open and poll until it finishes, with a timeout. The run's success or failure *is* the job's success or failure. Simple to reason about. The cost is a workflow that sits and waits, consuming a runner minute-for-minute while the job sits in a queue.
-- **Asynchronous:** submit the job, record its ID, and let the workflow exit immediately. A separate process — another workflow, a scheduled reaper, a webhook consumer — collects the result later. More moving parts, but the runner isn't held hostage to queue time.
+- **Blocking (synchronous):** submit the job, then hold the workflow open and poll until it finishes, with a timeout. The run's success or failure *is* the job's success or failure. The cost is a workflow that sits and waits, consuming a runner minute-for-minute while the job sits in a queue.
+- **Asynchronous:** submit the job, record its ID, and let the workflow exit immediately. A separate process — another workflow, a scheduled reaper, a webhook consumer — collects the result later. More complexity, but the runner queue time becomes less important.
 
-For one circuit, on merge, blocking is the right call. Qiskit Runtime hands over a job object when you submit through the Sampler primitive; poll it to completion and read the result. The whole thing fits in a single workflow step with a timeout guard. It's the naive choice and also the right one until volume forces the issue. Complexity not yet needed is complexity working against you.
+For one circuit, on merge, blocking is the right call. Qiskit Runtime hands over a job object when you submit through the Sampler primitive; poll it to completion and read the result. The whole execution fits in a single workflow step with a timeout guard. Until volume forces the issue, additional complexity is not needed.
 
 ### When blocking stops being the answer
 
-Blocking breaks down along predictable lines, primarily around the scarcity of quantum resources. 
-Queue wait time is worth naming so the wall is visible before hitting it:
+Blocking breaks down along predictable lines, primarily around the scarcity of quantum resources.
 
 - **Queue time dominates.** If jobs routinely sit in a device queue for a long time, you're paying for idle runner minutes to watch a spinner. That's the first real pressure toward async.
 - **Volume grows.** One circuit blocking is fine. Fifty circuits each blocking a runner is a self-inflicted outage.
 - **The job outlives the runner.** GitHub-hosted runners have time limits. A job that could exceed them can't be run to completion in a single blocking step.
 
-The asynchronous upgrade path, when it's needed, has a recognizable shape: the submit step writes the job ID to durable storage and exits. A decoupled workflow — triggered on a schedule, or by a callback — reaps finished jobs, records results, and reports. When submission volume gets high enough to need backpressure and retries, a **message queue** is the natural seam: submissions become messages, a worker pool drains them at whatever rate the hardware and the budget allow, and results flow back onto another queue. A durable workflow engine or the provider's own job-tracking would work too; a queue is the classic choice, not the only one.
-
-The async path isn't built in this first version, on purpose. But the boundary is designed so it drops in later without reshaping everything: because the submit step already produces a job ID and a result file rather than assuming it can see the answer synchronously, moving the "read the answer" half into a separate workflow is an extension, not a rewrite. Baking "submit and read in one breath" into the core would mean rewriting instead of extending later.
-
-> **Margin question.** For teams already running quantum workloads at scale — what actually pushes them off blocking, and what do they reach for instead? Queue time seems like the likelier trigger than runner limits, but that's a guess worth checking.
+The asynchronous upgrade path, when it's needed, is predictably simple: the submit step writes the job ID to durable storage and exits. A decoupled workflow — triggered on a schedule, or by a callback — reaps finished jobs, records results, and reports. When submission volume gets high enough to need backpressure and retries, a **message queue** is the natural solution: submissions become messages, a worker pool drains them at whatever rate the hardware and the budget allow, and results flow back onto another queue.
 
 ### The mistake almost shipped: triggering on every merge, not every circuit change
 
-The first version of `run-on-merge.yml` gets built the obvious way: trigger on push to main. Nothing more. It runs, so the expensive part looks solved, and attention moves on to the accountability model in Part 5.
-
-A fair question surfaces later: is the team paying for a quantum job every time someone merges a README fix? Checking the trigger honestly, the answer is yes. It doesn't know or care whether the circuit changed — it fires on every push to main, because "push to main" is the only condition written down. A typo fix and a genuine circuit change look identical to the workflow.
-
-That's a cost problem, but it's also a governance problem, and the second one matters more. The prod environment's required-reviewer gate exists so a human looks at "should this specific run happen" before real money moves. If that approval request shows up for merges that obviously have nothing to do with the circuit, reviewers learn — correctly, rationally — that most of these requests carry no signal, and start approving on reflex. The gate is still technically satisfied. It's quietly stopped doing its job.
-
-The fix is a `paths:` filter on the trigger, scoped to the circuit payload directory and the small set of pipeline files that decide what actually gets submitted. Spend should track circuit changes, not merge cadence. This is a design bug, not an edge case — the question "what should *not* cause this to run" simply hadn't been asked yet.
+A fair question surfaces later: is the team paying for a quantum job every time someone merges a README fix? The fix is a `paths:` filter on the trigger, scoped to the circuit payload directory and the small set of pipeline files that decide what actually gets submitted. Spend should track circuit changes, not merge cadence.
 
 ---
 
