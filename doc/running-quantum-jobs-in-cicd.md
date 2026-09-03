@@ -302,7 +302,7 @@ flowchart LR
 
 No solid line connects the three boxes on purpose — nothing in one system depends on or feeds the others. That absence of a direct link is what makes the dotted cross-checks meaningful; collapse any two identities into one and there is nothing left to check.
 
-**This is also the real reason for two credential pairs.** Distinct Service IDs per environment mean the *provider-side* audit trail can distinguish "this ran under the gated prod identity" from "this ran under the ungated dev identity" **without trusting GitHub at all.** The identity boundary is enforced at IBM, mirrored at GitHub, and the two have to agree with each other. Two differently-named secrets sharing one underlying identity would look fine in GitHub and be invisible in IBM's trail — exactly the collapse worth avoiding. The two pairs aren't about spend limits; they're about keeping the accountability trail legible on the side you don't control.
+**This is also the real reason for two credential pairs.** Distinct Service IDs per environment mean the *provider-side* audit trail can distinguish "this ran under the gated prod identity" from "this ran under the ungated dev identity" **without trusting GitHub at all.** The identity boundary is enforced at IBM, mirrored at GitHub, and the two have to agree with each other. Two differently-named secrets sharing one underlying identity would look fine in GitHub and be invisible in IBM's trail. The two pairs aren't about spend limits; they're about keeping the accountability trail legible on the side you don't control.
 
 ---
 
@@ -316,11 +316,7 @@ The thing rarely discussed is almost the inverse, and it's far more mundane. It'
 
 Worth being precise about what this is and isn't claiming, because it'd be easy to dress this up as the cryptographic threat and lose the thread. This is *not* claiming quantum jobs break credentials or crypto. It's a narrower operational question: as quantum submission pipelines proliferate inside ordinary engineering orgs, is the *pipeline itself* — the credential, the approval gate, the opaque-workload problem — getting the same governance scrutiny as any other system that can spend money and run code nobody can read? The honest impression is often not, mostly because the whole topic gets filed under "quantum, i.e. someone else's problem for now," when the CI/CD exposure is a today problem for anyone who could be handed this task.
 
-That impression is exactly the accountability model in Part 5: keep the three identities separate so that when — not if — someone fumbles an approval, the trail survives on infrastructure outside your own control. Open questions worth sitting with:
-
-- Is this already a recognized category with existing literature?
-- Is the three-identity, don't-collapse-the-trail model the right shape, or over- or under-built?
-- Is "opaque expensive workload approved by someone who can't read it" a problem existing controls already cover, or a genuine gap worth naming before these pipelines are everywhere?
+That impression is exactly the accountability model in Part 5: keep the three identities separate so that when — not if — someone fumbles an approval, the trail survives on infrastructure outside your own control.
 
 Better to start this conversation a little too early and be told it's already handled, than have it start after the first expensive mistake.
 
